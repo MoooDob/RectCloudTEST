@@ -108,7 +108,7 @@ public class SpiralTEST extends Application {
 					scene_width / 2, scene_height / 2, /*new location*/ 
 					500, /* max Radius */
 					0, // 40.0, /* Segments or -> Segments==0 && deltaRadius > 0 */
-					10000.0, // 2.0, /* Spinrate */
+					5.0, // 2.0, /* Spinrate */
 					1, /* deltaRadius or -> Segments */
 					rectWidth, /* rectWidth */
 					rectHeight, /* rectHeight */
@@ -192,49 +192,107 @@ public class SpiralTEST extends Application {
 	
 	
 	
-	// according to https://stackoverflow.com/q/48492980
-	/**
-	 * @param x0
-	 * @param y0
-	 * @param maxRadius
-	 * @param numSegments
-	 * @param spinRate
-	 * @param deltaR
-	 * @param rectWidth
-	 * @param rectHeight
-	 * @param textRectGC
-	 * @param spiralGC
-	 * @return
-	 */
+//	// according to https://stackoverflow.com/q/48492980
+//	public Rectangle checkRectCollision(double x0, double y0, double maxRadius, double numSegments, double spinRate, double deltaR,
+//			double rectWidth, double rectHeight, GraphicsContext textRectGC, GraphicsContext spiralGC) {
+//		double radius = 0.00001;
+//		double x = x0;
+//		double y = y0;
+//		if (numSegments > 0) {
+//			deltaR = maxRadius / numSegments;
+//		} else {
+//			numSegments = maxRadius / deltaR;
+//		}
+//	
+//
+//		int step = 1;
+//		Rectangle newRect = null; 
+//		while (
+////				(newRect = massCheckCollisonAABB(x, y, rectWidth, rectHeight)) == null && 
+//				radius < maxRadius
+//				) {
+//			double x1 = x;
+//			double y1 = y;
+////			radius += deltaR;
+//			radius += deltaR * step / (radius * 10);
+////			x = x0 + radius * Math.cos((2 * Math.PI * step / numSegments));
+////			y = y0 + radius * Math.sin((2 * Math.PI * step / numSegments));
+//			x = x0 + radius * Math.cos((2 * Math.PI * step / (radius * 10)));
+//			y = y0 + radius * Math.sin((2 * Math.PI * step / (radius * 10)));
+//			spiralGC.strokeLine(x, y, x1, y1);
+//
+//			spiralGC.fillOval(x-5/2, y-5/2, 5, 5);
+//
+////			  textRectGC.setStroke(Color.GREY);
+////            textRectGC.strokeRect(x - rectHeight /2, y - rectWidth / 2, rectHeight, rectWidth);
+////            textRectGC.strokeRect(x - rectWidth /2, y - rectHeight / 2, rectWidth, rectHeight);
+//
+////            textRectGC.strokeRect(x, y, rectWidth, rectHeight);
+////            textRectGC.strokeRect(x-rectWidth, y, rectWidth, rectHeight);
+////            textRectGC.strokeRect(x, y-rectHeight, rectWidth, rectHeight);
+////            textRectGC.strokeRect(x-rectWidth, y-rectHeight, rectWidth, rectHeight);
+////	            
+////            textRectGC.strokeRect(x, y, rectHeight, rectWidth);
+////            textRectGC.strokeRect(x-rectHeight, y, rectHeight, rectWidth);
+////            textRectGC.strokeRect(x, y-rectHeight, rectHeight, rectWidth);
+////            textRectGC.strokeRect(x-rectHeight, y-rectWidth, rectHeight, rectWidth);
+//
+////			System.out.println(String.format("radius0 %.2f x= %.0f y= %.0f",
+////					radius,
+////					x,
+////					y
+////			));
+//			
+//			step++;
+//
+//		}
+//
+//		textRectGC.setStroke(Color.AQUAMARINE);
+//		if (newRect != null) {
+//			textRectGC.strokeRect(newRect.getX(), newRect.getY(), newRect.getWidth(), newRect.getHeight());
+//		}
+//		
+//		return newRect;
+//	}
+	
+	
+	// Wurzelspirale
 	public Rectangle checkRectCollision(double x0, double y0, double maxRadius, double numSegments, double spinRate, double deltaR,
 			double rectWidth, double rectHeight, GraphicsContext textRectGC, GraphicsContext spiralGC) {
 		double radius = 0.00001;
-		double x = x0;
-		double y = y0;
+		double x = 0;
+		double y = 1;
 		if (numSegments > 0) {
 			deltaR = maxRadius / numSegments;
 		} else {
 			numSegments = maxRadius / deltaR;
 		}
 	
-
+		double Abstand = 10.0d;
+		
 		int step = 1;
 		Rectangle newRect = null; 
 		while (
 //				(newRect = massCheckCollisonAABB(x, y, rectWidth, rectHeight)) == null && 
-				radius < maxRadius
+				radius < maxRadius &&
+				step < 1000
 				) {
 			double x1 = x;
 			double y1 = y;
 //			radius += deltaR;
-			radius += deltaR * step / (radius * 10);
-//			x = x0 + radius * Math.cos((2 * Math.PI * step / numSegments) * spinRate);
-//			y = y0 + radius * Math.sin((2 * Math.PI * step / numSegments) * spinRate);
-			x = x0 + radius * Math.cos((2 * Math.PI * step / (radius * 10)));
-			y = y0 + radius * Math.sin((2 * Math.PI * step / (radius * 10)));
-			spiralGC.strokeLine(x, y, x1, y1);
+//			radius += deltaR * step / (radius * 10);
+//			x = x0 + radius * Math.cos((2 * Math.PI * step / numSegments));
+//			y = y0 + radius * Math.sin((2 * Math.PI * step / numSegments));
+//			x = x0 + radius * Math.cos((2 * Math.PI * step / (radius * 10)));
+//			y = y0 + radius * Math.sin((2 * Math.PI * step / (radius * 10)));
+			
+			double h = Math.sqrt((Math.pow(x, 2) + Math.pow(y,2))) / spinRate;
+	        x = x1 - y1/h;
+	        y = y1 + x1/h;	       
+			
+			spiralGC.strokeLine(x0 + x, y0 + y, x0 + x1, y0 + y1);
 
-			spiralGC.fillOval(x-5/2, y-5/2, 5, 5);
+			spiralGC.fillOval(x0 + x -5/2, y0 + y -5/2, 5, 5);
 
 //			  textRectGC.setStroke(Color.GREY);
 //            textRectGC.strokeRect(x - rectHeight /2, y - rectWidth / 2, rectHeight, rectWidth);
@@ -267,5 +325,6 @@ public class SpiralTEST extends Application {
 		
 		return newRect;
 	}
+
 
 }
