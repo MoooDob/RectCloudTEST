@@ -386,7 +386,7 @@ public class SpiralTEST extends Application {
 			double x1 = x;
 			double y1 = y;
 			
-			double h = Math.sqrt((Math.pow(x, 2) + Math.pow(y,2))) / spinRate;
+			double h = Math.sqrt((Math.pow(x,2) + Math.pow(y,2))) / spinRate;
 	        x = x1 - y1/h;
 	        y = y1 + x1/h;	 
 	        
