@@ -1,7 +1,18 @@
 package Application;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Random;
+import java.util.Scanner;
+
+import org.apache.commons.imaging.color.ColorCieLab;
+import org.apache.commons.imaging.color.ColorConversions;
+import org.apache.commons.io.FilenameUtils;
 
 import javafx.animation.Animation.Status;
 import javafx.animation.AnimationTimer;
@@ -25,8 +36,10 @@ import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import javafx.util.Pair;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.ArcType;
 import javafx.scene.shape.Rectangle;
@@ -35,19 +48,32 @@ import javafx.scene.shape.StrokeLineJoin;
 
 public class SpiralTEST extends Application {
 
+	boolean showFiles = true;
 	double scene_width = 1000;
 	double scene_height = 800;
 	int numOfRectangles = 10;
 	double maxRectHeight = scene_width / 8;
 	double maxRectWidth = scene_height / 9;
 	double fadeOffset = 200; 
+	
+	// Files with this extension will be shown, null or empty array => all files 
+	final String[] fileExtensionFilter = {}; //{"java"}; // {"java", "cpp", "h"} // null /*=> all*/
+
+	// files with this extension will shown using their dimension (max line length x lines),
+	// other files will be shown using an equal sized rounded rectangle
+	// null or empty array => show all files with dimensions
+	final String[] dimensionDisplayExtensionFilter = {}; // {"java"}
+
+	// files with this file name will be explicitly shown using their dimension 
+	// (max line length x lines)
+	final String[] dimensionDisplayFilenameFilter = {}; // {"readme.md"}
 
 
 	// **************************
 
 	private Random randomizer = new Random(34);
 
-	private Rectangle[] rectangles = new Rectangle[numOfRectangles];
+	//private ArrayList<Rectangle> rectangles = new ArrayList<Rectangle>();
 
 	private int rectCounter = 0;
 	
@@ -55,7 +81,53 @@ public class SpiralTEST extends Application {
     
 	Timeline spiralCollisionCheckAnimationTimeline = null;
 	
+	// Array for all files
+	ArrayList<String> allFiles = new ArrayList<String>();
 	
+	// Array for all files
+	HashMap<String, ColorCieLab> fileColors = new HashMap<String,ColorCieLab>(); 
+	
+	// Color space
+	final double L_MIN = 10;
+	final double L_MAX = 90;
+	
+	final int A_MIN = -128;
+	final int A_MAX =  127;
+	final int B_MIN = -128;
+	final int B_MAX =  127;
+	
+	
+	public final class ImmutableTriple<L, M, R> {
+
+	    public final L left;
+	    public final M middle;
+	    public final R right;
+
+	    public <L, M, R> ImmutableTriple<L, M, R> of(final L left, final M middle, final R right) {
+	        return new ImmutableTriple<L, M, R>(left, middle, right);
+	    }
+
+	    public ImmutableTriple(final L left, final M middle, final R right) {
+	        super();
+	        this.left = left;
+	        this.middle = middle;
+	        this.right = right;
+	    }
+
+	    //-----------------------------------------------------------------------
+	    public L getLeft() {
+	        return left;
+	    }
+
+	    public M getMiddle() {
+	        return middle;
+	    }
+
+	    public R getRight() {
+	        return right;
+	    }
+	}
+
 	
 	class TimelineEvent implements EventHandler<ActionEvent> {
 
@@ -70,11 +142,11 @@ public class SpiralTEST extends Application {
 
 		private Pane rectCloud;
 		private Pane testRectCloud;
+		private Rectangle[] testRects;
 		
 		private Canvas spiralCanvas;
-		private Canvas testRectCanvas;
 		
-		private Rectangle[] testRects;
+		
 
 		@Override
 		public void handle(ActionEvent event) {
@@ -105,11 +177,7 @@ public class SpiralTEST extends Application {
 			ft.setDelay(new Duration(fadeOffset));
 			ft.play();
 
-//			// Debug draw
-//			testRectCanvas.getGraphicsContext2D().setStroke(Color.LIGHTGRAY);
-//			testRectCanvas.getGraphicsContext2D().strokeRect(currentTestRect.getX(), currentTestRect.getY(), currentTestRect.getWidth(), currentTestRect.getHeight());
-
-	        boolean collision = checkCollisonAABB(x0 + x, y0 + y, rectWidth, rectHeight, step, currentTestRect, testRectCanvas.getGraphicsContext2D());
+	        boolean collision = checkCollisonAABB(x0 + x, y0 + y, rectWidth, rectHeight, step, currentTestRect, rectCloud);
 			if (collision 
 					&& step < 1000 // emergency break
 					) {
@@ -126,50 +194,25 @@ public class SpiralTEST extends Application {
 				spiralCanvas.getGraphicsContext2D().strokeLine(x0 + x, y0 + y, x0 + x1, y0 + y1);
 				spiralCanvas.getGraphicsContext2D().fillOval(x0 + x -5/2, y0 + y -5/2, 5, 5);
 
-//	            textRectGC.strokeRect(x, y, rectWidth, rectHeight);
-//	            textRectGC.strokeRect(x-rectWidth, y, rectWidth, rectHeight);
-//	            textRectGC.strokeRect(x, y-rectHeight, rectWidth, rectHeight);
-//	            textRectGC.strokeRect(x-rectWidth, y-rectHeight, rectWidth, rectHeight);
-//		            
-//	            textRectGC.strokeRect(x, y, rectHeight, rectWidth);
-//	            textRectGC.strokeRect(x-rectHeight, y, rectHeight, rectWidth);
-//	            textRectGC.strokeRect(x, y-rectHeight, rectHeight, rectWidth);
-//	            textRectGC.strokeRect(x-rectHeight, y-rectWidth, rectHeight, rectWidth);
-
-//				System.out.println(String.format("radius0 %.2f x= %.0f y= %.0f",
-//						radius,
-//						x,
-//						y
-//				));
-
 				step++;
 				
 	        } else {
 	        	// Found collision free location OR more than 1000 steps needed
 		        System.out.println("Drawing Animation stopped.");
 	        	spiralCollisionCheckAnimationTimeline.stop();
-    			
-//    			// draw resulting TestRectangle
-//    			testRectCanvas.getGraphicsContext2D().setStroke(Color.GREEN);
-//    			testRectCanvas.getGraphicsContext2D().setFill(Color.GREEN);
-//    			testRectCanvas.getGraphicsContext2D().setLineWidth(4);
-//    			testRectCanvas.getGraphicsContext2D().fillOval(currentTestRect.getX() + currentTestRect.getWidth() / 2 - 10/2, currentTestRect.getY() + currentTestRect.getHeight() / 2 - 10/2, 10, 10);
-//    			testRectCanvas.getGraphicsContext2D().strokeRect(currentTestRect.getX(), currentTestRect.getY(), currentTestRect.getWidth(), currentTestRect.getHeight());
-    			
-    			rectangles[rectCounter] = currentTestRect;
-    			rectCounter++;
+    			   			    		
+    			// Clone Rectangle and add to RectCloud
+    			Rectangle newRect = new Rectangle(currentTestRect.getX(), currentTestRect.getY(), currentTestRect.getWidth(), currentTestRect.getHeight()); 
+    			newRect.setStroke(Color.BLACK);
+    			newRect.setFill(Color.TRANSPARENT);
+				rectCloud.getChildren().add(newRect);
     			System.out.println(String.format("rect @ x= %.0f y= %.0f width= %.0f height= %.0f added.",
     					currentTestRect.getX(),
     					currentTestRect.getY(),
     					currentTestRect.getWidth(),
     					currentTestRect.getHeight()
 				));
-    			
-    			// Clone Rectangle and add to RectCloud
-    			Rectangle newRect = new Rectangle(currentTestRect.getX(), currentTestRect.getY(), currentTestRect.getWidth(), currentTestRect.getHeight()); 
-    			newRect.setStroke(Color.BLACK);
-    			newRect.setFill(Color.TRANSPARENT);
-				rectCloud.getChildren().add(newRect);
+
 
 				// Fading
 				ft = new FadeTransition(Duration.millis(3000), spiralCanvas);
@@ -187,7 +230,7 @@ public class SpiralTEST extends Application {
 	        }
 	    }
 		
-		public TimelineEvent init(double x0, double y0, double rectWidth, double rectHeight, double spinRate, Pane rectCloud2, Pane testRectCloud2, Canvas spiralCanvas, Canvas testRectCanvas) {
+		public TimelineEvent init(double x0, double y0, double rectWidth, double rectHeight, double spinRate, Pane rectCloud2, Pane testRectCloud2, Canvas spiralCanvas) {
 			this.x0 = x0;
 			this.y0 = y0;
 			this.rectWidth = rectWidth;
@@ -195,7 +238,6 @@ public class SpiralTEST extends Application {
 			this.spinRate = spinRate;
 			this.rectCloud = rectCloud2;
 			this.spiralCanvas = spiralCanvas;
-			this.testRectCanvas = testRectCanvas;
 			this.testRectCloud = testRectCloud2;
 			this.testRects = null;
 			x = 0;
@@ -214,112 +256,140 @@ public class SpiralTEST extends Application {
 	*
 	*/
 	@Override
-	public void start(Stage stage) {	
-				
-        Label label = new Label("Press N to create new rects.");
-        
-    	// Creating a Group object
-		StackPane stackpane = new StackPane();
-		Pane rectCloud = new Pane();
-		stackpane.getChildren().add(rectCloud);
-				
-		Pane testRectCloud = new Pane();
-		stackpane.getChildren().add(testRectCloud);
-
-        BorderPane root = new BorderPane(stackpane);
-        root.setBottom(label);
-       
-
-		// for debugging
-		Canvas canvas = new Canvas(scene_width, scene_height);
-		GraphicsContext testRectGC = canvas.getGraphicsContext2D();
-		testRectGC.setStroke(Color.GREY);
-		testRectGC.setFill(Color.GREY);
-		testRectGC.setLineWidth(1);
-//		textRectGC.setLineCap(StrokeLineCap.BUTT);
-//		textRectGC.setLineJoin(StrokeLineJoin.BEVEL);
-//		textRectGC.setLineDashes(new double[] { 7, 7 });
-		stackpane.getChildren().add(canvas);
+	public void start(Stage stage) {
 		
-		// marker in the corner 
-		testRectGC.fillOval(scene_width-10,scene_height-10,10,10);
+		// ask for directory
 
-		// for debugging too
-		Canvas spiralCanvas = new Canvas(scene_width, scene_height);
-		GraphicsContext spiralGC = spiralCanvas.getGraphicsContext2D();
-		spiralGC.setStroke(Color.RED);
-		spiralGC.setFill(Color.RED);
-		stackpane.getChildren().add(spiralCanvas);
-		spiralCanvas.getGraphicsContext2D().setLineWidth(20);
-		spiralCanvas.getGraphicsContext2D().strokeRect(0, 0, 1000, 800);
-		spiralCanvas.getGraphicsContext2D().setLineWidth(1);
-		
-		// and for debugging too
-		Canvas guidesCanvas = new Canvas(scene_width, scene_height);
-		GraphicsContext guidesGC = guidesCanvas .getGraphicsContext2D();
-		guidesGC.setStroke(Color.LIGHTGRAY);
-		guidesGC.setFill(Color.LIGHTGRAY);
-		stackpane.getChildren().add(guidesCanvas);
-		guidesGC.strokeLine(scene_width / 2, 0, scene_width / 2, scene_height);
-		guidesGC.setLineWidth(10);
-		guidesGC.strokeRect(0, 0, 1000, 800);
-		guidesGC.setLineWidth(1);
+		DirectoryChooser dc = new DirectoryChooser();
+		File selectedDirectory = dc.showDialog(stage);
 
-		// Creating a scene object
-		Scene scene = new Scene(root, scene_width, scene_height + 17 /*label*/);
-		scene.setOnKeyPressed(e -> {
-		    if ((spiralCollisionCheckAnimationTimeline == null || spiralCollisionCheckAnimationTimeline.getStatus()==Status.STOPPED) && (e.getCode() == KeyCode.N)) {		    	
-		    	spiralGC.clearRect(0, 0, scene_width, scene_height);
-//		    	testRectGC.clearRect(0, 0, scene_width, scene_height);
-//				testRectGC.fillOval(scene_width-10,scene_height-10,10,10);
-		    	createAndSetNewRect(testRectGC, spiralGC, rectCloud, testRectCloud, spiralCanvas, canvas);
-	    	}
-		});
-
-		// Adding Title to the stage
-        stage.setTitle("Spiral Rectangle Cloud");
-
-		// Adding scene to the stage
-		stage.setScene(scene);		
-
-		// Displaying the contents of the stage
-		stage.show();
-		
-
-	
-	}
-
-	
-	
-	
-	private void createAndSetNewRect(GraphicsContext textRectGC, GraphicsContext spiralGC, Pane rectCloud, Pane testRectCloud, Canvas spiralCanvas, Canvas testRectCanvas) {
-		
-		System.out.println("");
-		
-		if (rectCounter < numOfRectangles) {
-		
-			// create random width and height in the defined limits 
-			double rectWidth = Math.floor(randomizer.nextDouble() * maxRectWidth);
-			double rectHeight = Math.floor(randomizer.nextDouble() * maxRectHeight);
-	
-			checkRectCollisionSpiralOfTheodorus(
-					scene_width / 2, scene_height / 2, /*center location of test spiral*/ 
-					20.0, // 2.0, /* spinRate */
-					rectWidth, /* rectWidth */
-					rectHeight, /* rectHeight */
-					rectCloud, 
-					testRectCloud,
-					spiralCanvas, 
-					testRectCanvas
-			);
-			
+		if (selectedDirectory == null) {
+			System.out.println("No directory selected. Terminated.");
 		} else {
-			System.out.println("max num of rects, canceled.");
+
+			// collect all files of the folder structure and sort
+			int totalNumOfLevels = visitDirectory(selectedDirectory, 0, hashAB(A_MIN,B_MIN), hashAB(A_MAX,B_MAX));			
+			Collections.sort(allFiles);
+			
+			// Calculate the RGB colors 
+			HashMap<String, Color> RGBColors = new HashMap<String, Color>();
+			for (String fullfilename : fileColors.keySet()) {
+				ColorCieLab LabColor = fileColors.get(fullfilename);
+				double L = L_MIN + (L_MAX - L_MIN)  * LabColor.L /*contains the level*/ / totalNumOfLevels;
+				Color parentDirectoryColor = convertLabToFXColor(new ColorCieLab(L, LabColor.a, LabColor.b));
+				RGBColors.put(fullfilename, parentDirectoryColor);
+			}
+				
+	        Label label = new Label("Press S to start.");
+	        
+	    	// Creating a Group object
+			StackPane stackpane = new StackPane();
+			Pane rectCloud = new Pane();
+			stackpane.getChildren().add(rectCloud);
+					
+			Pane testRectCloud = new Pane();
+			stackpane.getChildren().add(testRectCloud);
+	
+	        BorderPane root = new BorderPane(stackpane);
+	        root.setBottom(label);
+	       
+			
+			// for debugging too
+			Canvas spiralCanvas = new Canvas(scene_width, scene_height);
+			GraphicsContext spiralGC = spiralCanvas.getGraphicsContext2D();
+			spiralGC.setStroke(Color.RED);
+			spiralGC.setFill(Color.RED);
+			stackpane.getChildren().add(spiralCanvas);
+			spiralCanvas.getGraphicsContext2D().setLineWidth(20);
+			spiralCanvas.getGraphicsContext2D().strokeRect(0, 0, 1000, 800);
+			spiralCanvas.getGraphicsContext2D().setLineWidth(1);
+			
+			// and for debugging too
+			Canvas guidesCanvas = new Canvas(scene_width, scene_height);
+			GraphicsContext guidesGC = guidesCanvas .getGraphicsContext2D();
+			guidesGC.setStroke(Color.LIGHTGRAY);
+			guidesGC.setFill(Color.LIGHTGRAY);
+			stackpane.getChildren().add(guidesCanvas);
+			guidesGC.strokeLine(scene_width / 2, 0, scene_width / 2, scene_height);
+			guidesGC.setLineWidth(10);
+			guidesGC.strokeRect(0, 0, 1000, 800);
+			guidesGC.setLineWidth(1);
+	
+			// Creating a scene object
+			Scene scene = new Scene(root, scene_width, scene_height + 17 /*label*/);
+			scene.setOnKeyPressed(e -> {
+			    if (
+			    		(spiralCollisionCheckAnimationTimeline == null
+			    		|| spiralCollisionCheckAnimationTimeline.getStatus()==Status.STOPPED
+			    		) 
+			    		&& (e.getCode() == KeyCode.S)
+			    		) {
+			    	
+					
+
+			    	for (int i = 0; i < allFiles.size(); i++) {
+			    		
+						File file = new File(allFiles.get(i));				
+						Color parentDirectoryColor = RGBColors.get(file.getAbsolutePath());
+						
+						int lineCtr = 0;
+						int maxLineLength = 0;
+						try {
+							Scanner scanner = new Scanner(file);
+							while (scanner.hasNextLine()) {
+								String line = scanner.nextLine();
+								maxLineLength = Math.max(maxLineLength, line.length());
+								lineCtr++;
+							}
+							scanner.close();
+						} catch (FileNotFoundException excep) {
+							excep.printStackTrace();
+						}
+
+						double height = 0;
+						double width = 0;
+						if (Arrays.stream(dimensionDisplayFilenameFilter).anyMatch(file.getName().toLowerCase()::equals)
+								|| dimensionDisplayExtensionFilter == null 
+								|| dimensionDisplayExtensionFilter.length == 0 
+								|| Arrays.stream(dimensionDisplayExtensionFilter).anyMatch(FilenameUtils.getExtension(file.getName().toLowerCase())::equals)
+								) {
+							// extension is in dimensionDisplayExtensionFilter
+							height = lineCtr;
+							width = maxLineLength;        	
+						} else {
+							// extension is not in dimensionDisplayExtensionFilter
+							height = 12;
+							width = 50;        
+						}
+						
+				    	spiralGC.clearRect(0, 0, scene_width, scene_height);
+				
+						checkRectCollisionSpiralOfTheodorus(
+							scene_width / 2, scene_height / 2, /*center location of test spiral*/ 
+							20.0, // 2.0, /* spinRate */
+							width, /* width of new rectangle */
+							height, /* height of new rectangle*/
+							rectCloud, 
+							testRectCloud,
+							spiralCanvas
+						);	
+			    	}
+		    	}
+			});
+	
+			// Adding Title to the stage
+	        stage.setTitle("Spiral Rectangle Cloud");
+	
+			// Adding scene to the stage
+			stage.setScene(scene);		
+	
+			// Displaying the contents of the stage
+			stage.show();
+			
 		}
-		
+	
 	}
 
-	
 	
 	
 	
@@ -335,7 +405,7 @@ public class SpiralTEST extends Application {
 	 * @param testRectGC GraphicsContext for drawing debug rectangles
 	 * @return
 	 */
-	private boolean checkCollisonAABB(double x, double y, double rectWidth, double rectHeight, int step, Rectangle currentTestRect, GraphicsContext testRectGC) {
+	private boolean checkCollisonAABB(double x, double y, double rectWidth, double rectHeight, int step, Rectangle currentTestRect, Pane RectCloud) {
 
 		System.out.println("center x= " + x + ", y= " + y );
 		System.out.println("dimensions of new rect: width= " + rectWidth + ", height= " + rectHeight);
@@ -351,15 +421,15 @@ public class SpiralTEST extends Application {
 				
 		// ... and check each for collision with all previously created rectangles
 		boolean anyCollisions = false;
-		for (Rectangle r : rectangles) {
+		for (Node r : RectCloud.getChildren()) {
 			
 			if (r == null) break;
 			
 			System.out.print(String.format("  against rect @ x= %.0f y= %.0f width= %.0f height= %.0f   ",
-					r.getX(),
-					r.getY(),
-					r.getWidth(),
-					r.getHeight()
+					((Rectangle)r).getX(),
+					((Rectangle)r).getY(),
+					((Rectangle)r).getWidth(),
+					((Rectangle)r).getHeight()
 			));
 
 			// getBoundsInLocal is only correct if and only if both objects are in the same coordinate system. 
@@ -421,45 +491,16 @@ public class SpiralTEST extends Application {
 			double x1 = x;
 			double y1 = y;
 			radius += deltaR;
-//			x = x0 + radius * Math.cos((2 * Math.PI * step / numSegments) * spainRate);
-//			y = y0 + radius * Math.sin((2 * Math.PI * step / numSegments) * spaiRate);
 			x = x0 + radius * Math.cos((2 * Math.PI * step / (radius * 10)) * spinRate);
 			y = y0 + radius * Math.sin((2 * Math.PI * step / (radius * 10)) * spinRate);
 			spiralGC.strokeLine(x, y, x1, y1);
 
 			spiralGC.fillOval(x-5/2, y-5/2, 5, 5);
-
-//			  textRectGC.setStroke(Color.GREY);
-//            textRectGC.strokeRect(x - rectHeight /2, y - rectWidth / 2, rectHeight, rectWidth);
-//            textRectGC.strokeRect(x - rectWidth /2, y - rectHeight / 2, rectWidth, rectHeight);
-
-//            textRectGC.strokeRect(x, y, rectWidth, rectHeight);
-//            textRectGC.strokeRect(x-rectWidth, y, rectWidth, rectHeight);
-//            textRectGC.strokeRect(x, y-rectHeight, rectWidth, rectHeight);
-//            textRectGC.strokeRect(x-rectWidth, y-rectHeight, rectWidth, rectHeight);
-//	            
-//            textRectGC.strokeRect(x, y, rectHeight, rectWidth);
-//            textRectGC.strokeRect(x-rectHeight, y, rectHeight, rectWidth);
-//            textRectGC.strokeRect(x, y-rectHeight, rectHeight, rectWidth);
-//            textRectGC.strokeRect(x-rectHeight, y-rectWidth, rectHeight, rectWidth);
-
-//			System.out.println(String.format("radius0 %.2f x= %.0f y= %.0f",
-//					radius,
-//					x,
-//					y
-//			));
 			
 			step++;
 
 		}
 
-
-		if (newRect != null) {
-			textRectGC.setStroke(Color.AQUAMARINE);
-			textRectGC.setFill(Color.AQUAMARINE);
-			textRectGC.fillOval(newRect.getX() + newRect.getWidth() / 2 - 10/2, newRect.getY() + newRect.getHeight() / 2  - 10/2, 10, 10);
-			textRectGC.strokeRect(newRect.getX(), newRect.getY(), newRect.getWidth(), newRect.getHeight());
-		}
 		
 		return newRect;
 	}
@@ -478,27 +519,131 @@ public class SpiralTEST extends Application {
 	 * @param spiralGC GraphicsContext for drawing debug information (the spiral itself)
 	 * @param rectCloud 
 	 * @param spiralCanvas 
-	 * @param testRectCanvas 
 	 * @param testRectCloud 
 	 */
 	public void checkRectCollisionSpiralOfTheodorus (double x0, double y0, double spinRate, 
-			double rectWidth, double rectHeight, Pane rectCloud, Pane testRectCloud, Canvas spiralCanvas, Canvas testRectCanvas) {
+			double rectWidth, double rectHeight, Pane rectCloud, Pane testRectCloud, Canvas spiralCanvas) {
 	
 		// Center of spiral
 		spiralCanvas.getGraphicsContext2D().fillOval(x0 -5/2, y0 -5/2, 5, 5);
 
-		
-		testRectCanvas.setOpacity(1);
 		spiralCanvas.setOpacity(1);
 		// remove all previous testRects
 		testRectCloud.getChildren().clear();
 
 		spiralCollisionCheckAnimationTimeline = new Timeline(new KeyFrame(Duration.millis(200), 
-				new TimelineEvent().init(x0, y0, rectWidth, rectHeight, spinRate, rectCloud, testRectCloud, spiralCanvas, testRectCanvas)));
+				new TimelineEvent().init(x0, y0, rectWidth, rectHeight, spinRate, rectCloud, testRectCloud, spiralCanvas)));
 		
 		spiralCollisionCheckAnimationTimeline.setCycleCount(Timeline.INDEFINITE);
 		spiralCollisionCheckAnimationTimeline.play();
 	}
 
+	private int visitDirectory(File directory, int level, double min_ab, double max_ab) {
+	
+			int numOfLevels = level;
+	//		System.out.println(directory.getAbsolutePath() + 
+	//				" L: " + level + 
+	//				" min_ab: " + min_ab + 
+	//				" max_ab: " + max_ab
+	//		);		
+			// Filter
+			String[] childFilesAndDirectories = directory.list(new FilenameFilter() {
+				public boolean accept(File dir, String name) {
+					File file = new File(dir, name);
+					if (fileExtensionFilter == null || fileExtensionFilter.length == 0 ) {
+						// No Filter defined
+						return true;
+					} else {
+						// check if file extension is in the list of allowed extensions
+						return file.isDirectory() || Arrays.stream(fileExtensionFilter).anyMatch(FilenameUtils.getExtension(name.toLowerCase())::equals);
+					}
+				};
+			});	
+			
+			// determine the number of child directories
+			String[] childDirectories = directory.list(new FilenameFilter() {
+				  @Override
+				  public boolean accept(File current, String name) {
+				    return new File(current, name).isDirectory();
+				  }
+				});
+			int numOfChildDirectories = childDirectories.length;
+					
+			// Color calculation
+			double delta_ab = max_ab - min_ab;
+			double part_ab = delta_ab / numOfChildDirectories;
+			double directory_ab = (max_ab + min_ab) / 2; // center of current a,b color range
+			Pair<Integer, Integer> AB = unhashAB((int)directory_ab);
+			int a = AB.getKey();
+			int b = AB.getValue();
+			ColorCieLab directoryColor = new ColorCieLab(level, a, b); 
+			
+	//		System.out.println(" delta: " + delta_ab + 
+	//				" num: " + numOfChildDirectories + 
+	//				" part_ab: " + part_ab + 
+	//				" dirab:" + directory_ab
+	//		);
+			
+			int childDirectoriesCounter = 0;
+			for (String FilesAndDirectories : childFilesAndDirectories) {
+	
+				
+				File fileOrDirectory = new File(directory, FilesAndDirectories);
+	
+				if (fileOrDirectory.isDirectory()) {
+					double current_min_ab = min_ab + childDirectoriesCounter * part_ab;
+					double current_max_ab = min_ab + childDirectoriesCounter * part_ab + part_ab;
+					
+	//				System.out.println(" " + fileOrDirectory.getAbsolutePath() + 
+	//						" current_min_ab: " + current_min_ab + 
+	//						" current_max_ab: " + current_max_ab
+	//				);
+	
+					numOfLevels = Math.max(numOfLevels, visitDirectory(fileOrDirectory, level + 1, current_min_ab, current_max_ab));
+					childDirectoriesCounter++;
+				} else {
+					if (showFiles) {
+						String s = fileOrDirectory.getAbsolutePath();
+						allFiles.add(fileOrDirectory.getAbsolutePath());
+						fileColors.put(s, directoryColor);
+					}
+				}
+			}
+			
+			return numOfLevels;
+			
+		}
+
+
+
+
+	private Color convertLabToFXColor(ColorCieLab color) {				
+			java.awt.Color colorRGB_awt = new java.awt.Color(ColorConversions.convertXYZtoRGB(ColorConversions.convertCIELabtoXYZ(color)));
+			Color fxColor = new Color((double)colorRGB_awt.getRed()/256, (double)colorRGB_awt.getGreen()/256, (double)colorRGB_awt.getBlue()/256, (double)colorRGB_awt.getAlpha()/256);
+	//		System.out.println(" Lab: " + color.toString() + 
+	//				" RGB: " + fxColor.toString() +
+	//				" R " + ((double)colorRGB_awt.getRed()/256) + 
+	//		        " G " + ((double)colorRGB_awt.getRed()/256) + 
+	//				" B " + ((double)colorRGB_awt.getRed()/256) + 
+	//				" A " + ((double)colorRGB_awt.getAlpha()/256)
+	//		);
+			return fxColor;
+		}
+
+
+
+
+	private static Pair<Integer,Integer> unhashAB(int hash) {
+		int a = (int) hash / 256;
+		int b = hash - a * 256;      
+	    return new Pair<Integer,Integer>(a,b);
+	}
+
+
+
+
+	private static int hashAB(int a, int b) {
+        return a * 256 + b;
+	}
 
 }
