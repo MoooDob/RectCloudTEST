@@ -27,6 +27,7 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.Background;
@@ -57,6 +58,8 @@ public class SpiralTEST extends Application {
 	double drawingSpeed = 0.1f;
 	double fadeOffset = drawingSpeed; 
 	double rectFadingSpeed = drawingSpeed * 10;
+	
+	int maxSteps = 1000;
 
 
 
@@ -135,14 +138,17 @@ public class SpiralTEST extends Application {
 		private Canvas spiralCanvas;
 		private int fileindex;
 		private int totalNumOfLevels;
-		private String filename;
-		
+		private String filename;		
 		
 
 		
 
 		@Override
 		public void handle(ActionEvent event) {
+			
+//			if (files.get(fileindex).filename.endsWith("UploadToServer.pas")) {
+//				System.out.println("no collision?");
+//			}
 	        
 	        if (spiralFader != null) spiralFader.stop();
 	        spiralCanvas.setOpacity(1);
@@ -150,8 +156,8 @@ public class SpiralTEST extends Application {
 			if (testRects == null || step % 2 == 0) {
 			// use x and y as center point for the testRects
 				testRects = new Rectangle[2];
-				testRects[0] =	new Rectangle(x0 + x - rectWidth / 2, y0 + y - rectHeight / 2, rectWidth, rectHeight); // Upright rectangle
-				testRects[1] =	new Rectangle(x0 + x - rectHeight / 2, y0 + y - rectWidth / 2, rectHeight, rectWidth);  // 90 degree rotated rectangle
+				testRects[0] = new Rectangle(x0 + x - rectWidth / 2, y0 + y - rectHeight / 2, rectWidth, rectHeight); // Upright rectangle
+				testRects[1] = new Rectangle(x0 + x - rectHeight / 2, y0 + y - rectWidth / 2, rectHeight, rectWidth);  // 90 degree rotated rectangle
 				
 				// Shuffle testRects to get a random orientation/alignment
 				shuffleArrayDurstenfeld(testRects);
@@ -183,7 +189,7 @@ public class SpiralTEST extends Application {
 
 	        boolean collision = checkCollisonAABB(x0 + x, y0 + y, rectWidth, rectHeight, step, currentTestRect, rectCloud);
 			if (collision 
-					&& step < 1000 // emergency break
+					&& step < maxSteps // emergency break
 					) {
 				
 				if (step % 2 == 1) {
@@ -196,7 +202,7 @@ public class SpiralTEST extends Application {
 			        x = x1 - y1/h;
 			        y = y1 + x1/h;	 
 			        
-			        // System.out.println("Step: " + step);
+//			        System.out.println("Step: " + step);
 					
 					// Draw spiral
 					spiralCanvas.getGraphicsContext2D().strokeLine(x0 + x, y0 + y, x0 + x1, y0 + y1);
@@ -214,39 +220,44 @@ public class SpiralTEST extends Application {
 	        	} else {
 	        		spiralCollisionCheckAnimationTimeline.pause();
 	        	}
+	        	
+	        	if (step < maxSteps) {
     			   			    		
-    			// Clone Rectangle and add to RectCloud
-    			Rectangle newRect = new Rectangle(currentTestRect.getX(), currentTestRect.getY(), currentTestRect.getWidth(), currentTestRect.getHeight());
-    			
-    			// Calc color
-				float brightness = HUE_MIN + (HUE_MAX - HUE_MIN) * files.get(fileindex).level / totalNumOfLevels;
-				Color parentDirectoryColor = ConvertAwtColorToJavaFX(java.awt.Color.getHSBColor(files.get(fileindex).hue, 1.0f, brightness));
-    			newRect.setStroke(Color.TRANSPARENT);
-    			newRect.setFill(parentDirectoryColor);
-				rectCloud.getChildren().add(newRect);
-//    			System.out.println(String.format("rect '%s' @ x= %.2f y= %.2f width= %.2f height= %.2f color=%s added.",
-//    					files.get(fileindex).filename,
-//    					newRect.getX(),
-//    					newRect.getY(),
-//    					newRect.getWidth(),
-//    					newRect.getHeight(),
-//    					parentDirectoryColor.toString()
-//				));
-				
-				// csv style
-    			System.out.println(String.format(Locale.US, "%s, %d, %.2f, %.2f, %.2f, %.2f, %s, %.2f, %.2f, %.2f",
-    					files.get(fileindex).filename,
-    					files.get(fileindex).level,
-    					newRect.getX(),
-    					newRect.getY(),
-    					newRect.getWidth(),
-    					newRect.getHeight(),
-    					parentDirectoryColor.toString(),
-    					files.get(fileindex).hue, 
-    					1.0f, 
-    					brightness
-				));
-
+	    			// Clone Rectangle and add to RectCloud
+	    			Rectangle newRect = new Rectangle(currentTestRect.getX(), currentTestRect.getY(), currentTestRect.getWidth(), currentTestRect.getHeight());
+	    			// Calc color
+					float brightness = HUE_MIN + (HUE_MAX - HUE_MIN) * files.get(fileindex).level / totalNumOfLevels;
+					Color parentDirectoryColor = ConvertAwtColorToJavaFX(java.awt.Color.getHSBColor(files.get(fileindex).hue, 1.0f, brightness));
+	    			newRect.setStroke(Color.TRANSPARENT);
+	    			newRect.setFill(parentDirectoryColor);
+	    	        Tooltip.install(newRect, new Tooltip(files.get(fileindex).filename));
+					rectCloud.getChildren().add(newRect);
+	//    			System.out.println(String.format("rect '%s' @ x= %.2f y= %.2f width= %.2f height= %.2f color=%s added.",
+	//    					files.get(fileindex).filename,
+	//    					newRect.getX(),
+	//    					newRect.getY(),
+	//    					newRect.getWidth(),
+	//    					newRect.getHeight(),
+	//    					parentDirectoryColor.toString()
+	//				));
+					
+	//				// csv style
+	//    			System.out.println(String.format(Locale.US, "%s, %d, %.2f, %.2f, %.2f, %.2f, %s, %.2f, %.2f, %.2f",
+	//    					files.get(fileindex).filename,
+	//    					files.get(fileindex).level,
+	//    					newRect.getX(),
+	//    					newRect.getY(),
+	//    					newRect.getWidth(),
+	//    					newRect.getHeight(),
+	//    					parentDirectoryColor.toString(),
+	//    					files.get(fileindex).hue, 
+	//    					1.0f, 
+	//    					brightness
+	//				));
+					
+	        	} else {
+	        		System.out.println("file '" + files.get(fileindex).filename + "' skipped because needs more then " + maxSteps + " steps to find a location.");
+	        	}
 
 				// Fading spiral canvas
 				spiralFader = new FadeTransition(Duration.millis(3000), spiralCanvas);
@@ -265,7 +276,12 @@ public class SpiralTEST extends Application {
 					fileindex++;
 					collisionCheckEvent.init(x0, y0, spinRate, totalNumOfLevels, rectCloud, testRectCloud, spiralCanvas);
 	        		spiralCollisionCheckAnimationTimeline.play();
-				} else label.setText(selectedDirectory.getName() + " finished.");
+				} else {
+					label.setText(selectedDirectory.getName() + " finished.");
+					spiralCanvas.setVisible(false);
+					testRectCloud.setVisible(false);
+				}
+				
 				
 
 	        }
@@ -461,12 +477,10 @@ public class SpiralTEST extends Application {
 	 */
 	private boolean checkCollisonAABB(double x, double y, double rectWidth, double rectHeight, int step, Rectangle currentTestRect, Pane RectCloud) {
 
-		// System.out.println("center of spiral x= " + x + ", y= " + y );
-		// System.out.println("dimensions of new rect: width= " + rectWidth + ", height= " + rectHeight);
-
-		// System.out.println("check collision of new rect against all " + rectCounter + " already positioned rects. ");	
-			
-//		System.out.println(String.format("check new rect @ x= %.2f y= %.2f width= %.2f height= %.2f",
+//		System.out.println("center of spiral x= " + x + ", y= " + y );
+//		System.out.println("dimensions of new rect: width= " + rectWidth + ", height= " + rectHeight);
+//		
+//		System.out.println(String.format("check collision of new rect @ x= %.2f y= %.2f width= %.2f height= %.2f against all " + RectCloud.getChildren().size() + " already positioned rects.",
 //				currentTestRect.getX(),
 //				currentTestRect.getY(),
 //				currentTestRect.getWidth(),
@@ -491,7 +505,7 @@ public class SpiralTEST extends Application {
 			// furthermore this function tests only the AABB (axis aligned bounding box) of both objects, 
 			// so rotated will be approximated with its AABB
 			boolean collision = r.getBoundsInParent().intersects(currentTestRect.getBoundsInLocal());
-			// System.out.println(collision ? "collision" : "no collision");
+//			System.out.println(collision ? "collision" : "no collision");
 			
 			anyCollisions |= collision;
 			
