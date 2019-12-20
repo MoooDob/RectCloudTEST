@@ -45,21 +45,21 @@ import javafx.animation.Animation.Status;
 
 public class SpiralTEST extends Application {
 
-	boolean showFiles = true;
-	double scene_width = 1000;
-	double scene_height = 800;
-	int numOfRectangles = 10;
-	double maxRectHeight = scene_width / 8;
-	double maxRectWidth = scene_height / 9;
+	final boolean showFiles = true;
+	final double scene_width = 1000;
+	final double scene_height = 800;
+	final int numOfRectangles = 10;
+	final double maxRectHeight = scene_width / 8;
+	final double maxRectWidth = scene_height / 9;
 	
-	double defaultWidth = 12;
-	double defaultHeight = 12;
+	final double defaultWidth = 12;
+	final double defaultHeight = 12;
 	
-	double drawingSpeed = 0.1f;
-	double fadeOffset = drawingSpeed; 
-	double rectFadingSpeed = drawingSpeed * 10;
+	final double drawingSpeed = 0.1f;
+	final double fadeOffset = drawingSpeed; 
+	final double rectFadingSpeed = drawingSpeed * 10;
 	
-	int maxSteps = 1000;
+	final int maxSteps = 1000;
 
 
 
@@ -80,21 +80,22 @@ public class SpiralTEST extends Application {
 	// **************************
 
 	
-	ArrayList<Rectangle> testedRectangles = new ArrayList<Rectangle>();
+	private final ArrayList<Rectangle> testedRectangles = new ArrayList<Rectangle>();
     
-	Timeline spiralCollisionCheckAnimationTimeline = null;
+	private final Timeline spiralCollisionCheckAnimationTimeline = new Timeline();
 
 	// HSB color space, limits for the hue value
-	final float HUE_MIN = .1f;
-	final float HUE_MAX = .9f;
+	private final float HUE_MIN = .1f;
+	private final float HUE_MAX = .9f;
 		
-	private ArrayList<FileInfo> files = new ArrayList<FileInfo>();
-	private TimelineEvent collisionCheckEvent;
+	private final ArrayList<FileInfo> files = new ArrayList<FileInfo>();
+	private final TimelineEvent collisionCheckEvent = new TimelineEvent();
 	
-	private Label label;
+	private final Label label = new Label();
 	private FadeTransition spiralFader;
 	
 	private File selectedDirectory;
+	private final int numRectOrientationsAndAlignments = 2;
 
 	
 	
@@ -153,9 +154,9 @@ public class SpiralTEST extends Application {
 	        if (spiralFader != null) spiralFader.stop();
 	        spiralCanvas.setOpacity(1);
 	        			
-			if (testRects == null || step % 2 == 0) {
+			if (testRects == null || step % numRectOrientationsAndAlignments == 0) {
 			// use x and y as center point for the testRects
-				testRects = new Rectangle[2];
+				testRects = new Rectangle[numRectOrientationsAndAlignments];
 				testRects[0] = new Rectangle(x0 + x - rectWidth / 2, y0 + y - rectHeight / 2, rectWidth, rectHeight); // Upright rectangle
 				testRects[1] = new Rectangle(x0 + x - rectHeight / 2, y0 + y - rectWidth / 2, rectHeight, rectWidth);  // 90 degree rotated rectangle
 				
@@ -163,7 +164,7 @@ public class SpiralTEST extends Application {
 				shuffleArrayDurstenfeld(testRects);
 			}
 	        
-			Rectangle currentTestRect = testRects[step % 2];
+			Rectangle currentTestRect = testRects[step % numRectOrientationsAndAlignments];
 			
 			// for visual debugging
 			testedRectangles.add(currentTestRect);
@@ -192,7 +193,7 @@ public class SpiralTEST extends Application {
 					&& step < maxSteps // emergency break
 					) {
 				
-				if (step % 2 == 1) {
+				if (step % numRectOrientationsAndAlignments  == numRectOrientationsAndAlignments - 1) {
 					
 					// calc next step in the spiral of Theodorus calculation (Wurzelspirale)
 					double x1 = x;
@@ -326,7 +327,7 @@ public class SpiralTEST extends Application {
 	@Override
 	public void start(Stage stage) {
 		
-		label = new Label("Select directory to analyse...");
+		label.setText("Select directory to analyse...");
 		
 		StackPane stackpane = new StackPane();
 		
@@ -445,13 +446,13 @@ public class SpiralTEST extends Application {
 			
 			
 			// init TimelineEvent and create Timeline
-			collisionCheckEvent = new TimelineEvent().init(
+			collisionCheckEvent.init(
 					scene_width / 2, scene_height / 2, /*center location of test spiral*/  
 					20.0, // 2.0, /* spinRate */ 
 					totalNumOfLevels,
 					rectCloud, testRectCloud, spiralCanvas
 			);
-			spiralCollisionCheckAnimationTimeline = new Timeline(new KeyFrame(Duration.millis(drawingSpeed), collisionCheckEvent));
+			spiralCollisionCheckAnimationTimeline.getKeyFrames().add(new KeyFrame(Duration.millis(drawingSpeed), collisionCheckEvent));
 			
 			spiralCollisionCheckAnimationTimeline.setCycleCount(Animation.INDEFINITE);
 			spiralCollisionCheckAnimationTimeline.play();
