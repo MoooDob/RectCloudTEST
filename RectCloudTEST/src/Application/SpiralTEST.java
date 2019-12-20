@@ -172,6 +172,13 @@ public class SpiralTEST extends Application {
 			rectFader.setToValue(0);
 			rectFader.setCycleCount(1);
 			rectFader.setDelay(new Duration(fadeOffset));
+			rectFader.setOnFinished(new EventHandler<ActionEvent>() {
+				@Override
+				public void handle(ActionEvent event) {
+					// remove faded rect from testRectCloud
+					testRectCloud.getChildren().remove(((FadeTransition)event.getSource()).getNode());
+				}
+			});
 			rectFader.play();
 
 	        boolean collision = checkCollisonAABB(x0 + x, y0 + y, rectWidth, rectHeight, step, currentTestRect, rectCloud);
