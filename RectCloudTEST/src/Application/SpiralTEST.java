@@ -60,6 +60,7 @@ public class SpiralTEST extends Application {
 	final double rectFadingSpeed = drawingSpeed * 10;
 	
 	final int maxSteps = 1000;
+	final double spinRate = 20;
 
 
 
@@ -96,6 +97,7 @@ public class SpiralTEST extends Application {
 	
 	private File selectedDirectory;
 	private final int numRectOrientationsAndAlignments = 2;
+
 
 	
 	
@@ -448,7 +450,7 @@ public class SpiralTEST extends Application {
 			// init TimelineEvent and create Timeline
 			collisionCheckEvent.init(
 					scene_width / 2, scene_height / 2, /*center location of test spiral*/  
-					20.0, // 2.0, /* spinRate */ 
+					spinRate, // 2.0, /* spinRate */ 
 					totalNumOfLevels,
 					rectCloud, testRectCloud, spiralCanvas
 			);
