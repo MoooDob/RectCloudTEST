@@ -61,9 +61,9 @@ public class SpiralTEST extends Application {
 	
 	final int maxSteps = 1000;
 	// density of winding
-	final double spinRate = 1;
+	final double spinRate = 0.5;
 	// number of probes per wind = distance of the probe
-	final double probeRate = 1; 
+	final double probeRate = 0.1; 
 
 
 
@@ -99,7 +99,7 @@ public class SpiralTEST extends Application {
 	private FadeTransition spiralFader;
 	
 	private File selectedDirectory;
-	private final int numRectOrientationsAndAlignments = 2;
+	private final int numRectOrientationsAndAlignments = 4;
 
 
 	
@@ -133,8 +133,8 @@ public class SpiralTEST extends Application {
 		private double rectWidth;
 		private double rectHeight;
 		private int step;
-		private double x;
-		private double y;
+		private double start_x = 1;
+		private double start_y = 1;
 		private double spinRate;
 
 		private Pane rectCloud;
@@ -144,7 +144,9 @@ public class SpiralTEST extends Application {
 		private Canvas spiralCanvas;
 		private int fileindex;
 		private int totalNumOfLevels;
-		private String filename;		
+		private String filename;
+		private double x = 0;
+		private double y = 0;		
 		
 
 		
@@ -159,16 +161,32 @@ public class SpiralTEST extends Application {
 	        if (spiralFader != null) spiralFader.stop();
 	        spiralCanvas.setOpacity(1);
 	        			
+	        
 			if (testRects == null || step % numRectOrientationsAndAlignments == 0) {
 			// use x and y as center point for the testRects
 				testRects = new Rectangle[numRectOrientationsAndAlignments];
-				testRects[0] = new Rectangle(x0 + x - rectWidth / 2, y0 + y - rectHeight / 2, rectWidth, rectHeight); // Upright rectangle
-				testRects[1] = new Rectangle(x0 + x - rectHeight / 2, y0 + y - rectWidth / 2, rectHeight, rectWidth);  // 90 degree rotated rectangle
-				
+				testRects[0] = new Rectangle(x0 + x - rectWidth / 2, y0 + y - rectHeight / 2, rectWidth, rectHeight); // portrait rectangle, center point
+				testRects[1] = new Rectangle(x0 + x - rectHeight / 2, y0 + y - rectWidth / 2, rectHeight, rectWidth);  // landscape rectangle, centerpoint
+					
+				testRects[2] = new Rectangle(
+						x0 + x - (x<0  ? rectWidth : 0), 
+						y0 + y - (y>=0 ? rectHeight : 0), 
+						rectWidth, 
+						rectHeight
+				); 
+				testRects[3] = new Rectangle(
+						x0 + x - (x<0  ? rectHeight: 0), 
+						y0 + y - (y>=0 ? rectWidth : 0), 
+						rectHeight, 
+						rectWidth
+				); 					
+
 				// Shuffle testRects to get a random orientation/alignment
-				shuffleArrayDurstenfeld(testRects);
+				shuffleArrayDurstenfeld(testRects, 0, 1);
+				shuffleArrayDurstenfeld(testRects, 2, testRects.length);
 			}
-	        
+			
+			
 			Rectangle currentTestRect = testRects[step % numRectOrientationsAndAlignments];
 			
 			// for visual debugging
@@ -305,9 +323,17 @@ public class SpiralTEST extends Application {
 			this.spiralCanvas = spiralCanvas;
 			this.testRectCloud = testRectCloud2;
 			this.testRects = null;
-			x = 0;
-			y = 2;			
+			
 			step = 0;
+			
+			// four possible start rotations for the spiral: x = [-1,1], y =[-1,1], rotate through these
+			start_x = start_x * -1;
+			start_y = -start_x * start_y;		
+			System.out.println("start.x=" + start_x + " start.y=" + start_y);
+			
+			x = start_x;
+			y = start_y;
+			
 			
 			// mark center of spiral
 			spiralCanvas.getGraphicsContext2D().fillOval(x0 -5/2, y0 -5/2, 5, 5);
@@ -469,6 +495,13 @@ public class SpiralTEST extends Application {
 	
 	
 	
+	public void shuffleArrayDurstenfeld(Rectangle[] testRects) {
+		shuffleArrayDurstenfeld(testRects, 0, testRects.length);		
+	}
+
+
+
+
 	/**
 	 * performs a AABB (Axis Aligned Bounding Box) collision check for the rectangle defined by x, y, rectWidth and rectHeight 
 	 * and the already plotted rectangle in the array 'rectangles'   
@@ -528,9 +561,9 @@ public class SpiralTEST extends Application {
 	 * seems (according to ) the an Fisher-Yates shuffle, exactly the Durstenfeld inplace shuffle implementation (Fisher–Yates shuffle)
 	 * @param the array to be shuffled
 	 */
-	private static <T> void shuffleArrayDurstenfeld(T[] testRects) {
+	private static <T> void shuffleArrayDurstenfeld(T[] testRects, int from, int to) {
 		Random rand = new Random(25);
-	    for (int i = testRects.length - 1; i > 0; i--)
+	    for (int i = testRects.length - 1 - to; i > from; i--)
 	    {
 	      int index = rand.nextInt(i + 1);
 	      // Simple swap two entries
