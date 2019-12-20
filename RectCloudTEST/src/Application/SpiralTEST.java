@@ -55,12 +55,15 @@ public class SpiralTEST extends Application {
 	final double defaultWidth = 12;
 	final double defaultHeight = 12;
 	
-	final double drawingSpeed = 0.1f;
+	final double drawingSpeed = 100f;
 	final double fadeOffset = drawingSpeed; 
 	final double rectFadingSpeed = drawingSpeed * 10;
 	
 	final int maxSteps = 1000;
-	final double spinRate = 20;
+	// density of winding
+	final double spinRate = 1;
+	// number of probes per wind = distance of the probe
+	final double probeRate = 1; 
 
 
 
@@ -201,7 +204,7 @@ public class SpiralTEST extends Application {
 					double x1 = x;
 					double y1 = y;
 					
-					double h = Math.sqrt((Math.pow(x,2) + Math.pow(y,2))) / spinRate;
+					double h = Math.sqrt((Math.pow(x * probeRate, 2) + Math.pow(y * probeRate, 2))) * spinRate;
 			        x = x1 - y1/h;
 			        y = y1 + x1/h;	 
 			        
@@ -303,7 +306,7 @@ public class SpiralTEST extends Application {
 			this.testRectCloud = testRectCloud2;
 			this.testRects = null;
 			x = 0;
-			y = 1;			
+			y = 2;			
 			step = 0;
 			
 			// mark center of spiral
