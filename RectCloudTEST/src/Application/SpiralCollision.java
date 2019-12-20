@@ -43,7 +43,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.animation.Animation.Status;
 
-public class SpiralTEST extends Application {
+public class SpiralCollision extends Application {
 
 	final boolean showFiles = true;
 	final double scene_width = 1000;
@@ -87,13 +87,16 @@ public class SpiralTEST extends Application {
 	private final ArrayList<Rectangle> testedRectangles = new ArrayList<Rectangle>();
     
 	private final Timeline spiralCollisionCheckAnimationTimeline = new Timeline();
+	private final Timeline fineTuningPositionTimeline = new Timeline();
 
 	// HSB color space, limits for the hue value
 	private final float HUE_MIN = .1f;
 	private final float HUE_MAX = .9f;
 		
 	private final ArrayList<FileInfo> files = new ArrayList<FileInfo>();
-	private final TimelineEvent collisionCheckEvent = new TimelineEvent();
+	private final SpiralPositioningEvent spiralPositioningEvent = new SpiralPositioningEvent();
+	private final FineTuningPositionEvent fineTuningPositionEvent = new FineTuningPositionEvent();
+
 	
 	private final Label label = new Label();
 	private FadeTransition spiralFader;
@@ -124,17 +127,29 @@ public class SpiralTEST extends Application {
 		int level = -1;
 	}
 	
+	
+	
+	
+	private class FineTuningPositionEvent implements EventHandler<ActionEvent> {
+
+		@Override
+		public void handle(ActionEvent event) {
+			
+			System.out.println("test");
+		
+		}
+	}
+	
+	
 
 	
-	private class TimelineEvent implements EventHandler<ActionEvent> {
+	private class SpiralPositioningEvent implements EventHandler<ActionEvent> {
 
 		private double x0;
 		private double y0;
 		private double rectWidth;
 		private double rectHeight;
 		private int step;
-		private double start_x = 1;
-		private double start_y = 1;
 		private double spinRate;
 
 		private Pane rectCloud;
@@ -145,6 +160,9 @@ public class SpiralTEST extends Application {
 		private int fileindex;
 		private int totalNumOfLevels;
 		private String filename;
+
+		private double start_x = 1;
+		private double start_y = 1;
 		private double x = 0;
 		private double y = 0;		
 		
@@ -246,6 +264,11 @@ public class SpiralTEST extends Application {
 	        	}
 	        	
 	        	if (step < maxSteps) {
+	        		
+	        		// Location finetuning
+	        		
+	        		
+	        		
     			   			    		
 	    			// Clone Rectangle and add to RectCloud
 	    			Rectangle newRect = new Rectangle(currentTestRect.getX(), currentTestRect.getY(), currentTestRect.getWidth(), currentTestRect.getHeight());
@@ -298,7 +321,7 @@ public class SpiralTEST extends Application {
 					// get next fileInfo
 			    	spiralCanvas.getGraphicsContext2D().clearRect(0, 0, scene_width, scene_height);
 					fileindex++;
-					collisionCheckEvent.init(x0, y0, spinRate, totalNumOfLevels, rectCloud, testRectCloud, spiralCanvas);
+					spiralPositioningEvent.init(x0, y0, spinRate, totalNumOfLevels, rectCloud, testRectCloud, spiralCanvas);
 	        		spiralCollisionCheckAnimationTimeline.play();
 				} else {
 					label.setText(selectedDirectory.getName() + " finished.");
@@ -311,7 +334,7 @@ public class SpiralTEST extends Application {
 	        }
 	    }
 		
-		public TimelineEvent init(double x0, double y0, double spinRate, int totalNumOfLevels, Pane rectCloud2, Pane testRectCloud2, Canvas spiralCanvas) {
+		public SpiralPositioningEvent init(double x0, double y0, double spinRate, int totalNumOfLevels, Pane rectCloud2, Pane testRectCloud2, Canvas spiralCanvas) {
 			this.x0 = x0;
 			this.y0 = y0;
 			this.filename = files.get(fileindex).filename;
@@ -474,16 +497,22 @@ public class SpiralTEST extends Application {
 			    }
 			});
 
+
+			
+			spiralCollisionCheckAnimationTimeline.getKeyFrames().add(new KeyFrame(Duration.millis(drawingSpeed), fineTuningPositionEvent));
+			fineTuningPositionTimeline.setCycleCount(Animation.INDEFINITE);
+			fineTuningPositionTimeline.play();
+						
 			
 			
 			// init TimelineEvent and create Timeline
-			collisionCheckEvent.init(
+			spiralPositioningEvent.init(
 					scene_width / 2, scene_height / 2, /*center location of test spiral*/  
 					spinRate, // 2.0, /* spinRate */ 
 					totalNumOfLevels,
 					rectCloud, testRectCloud, spiralCanvas
 			);
-			spiralCollisionCheckAnimationTimeline.getKeyFrames().add(new KeyFrame(Duration.millis(drawingSpeed), collisionCheckEvent));
+			spiralCollisionCheckAnimationTimeline.getKeyFrames().add(new KeyFrame(Duration.millis(drawingSpeed), spiralPositioningEvent));
 			
 			spiralCollisionCheckAnimationTimeline.setCycleCount(Animation.INDEFINITE);
 			spiralCollisionCheckAnimationTimeline.play();
