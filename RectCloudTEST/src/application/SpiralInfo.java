@@ -2,7 +2,6 @@ package application;
 
 import java.util.LinkedList;
 
-import org.apache.commons.collections4.list.CursorableLinkedList;
 
 public class SpiralInfo {
 	
@@ -17,7 +16,7 @@ public class SpiralInfo {
 	public int latestIndex = -1;
 	public double latestX = 0;
 	public double latestY = 0;
-	public CursorableLinkedList<SpiralPoint> spiralpoints = new CursorableLinkedList<SpiralPoint>();
+	public LinkedList<SpiralPoint> spiralpoints = new LinkedList<SpiralPoint>();
 	
 	public void appendSpiralPoint(SpiralPoint spiralpoint) {
 		spiralpoints.add(spiralpoint);
