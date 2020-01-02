@@ -60,9 +60,9 @@ public class SpiralCollision extends Application {
 
 	public static long seed = 324;
 
-	final double drawingSpeed = 0.1f;
-	final double fadeOffset = drawingSpeed;
-	final double rectFadingSpeed = drawingSpeed * 3;
+	final double drawingSpeed = 1f;
+	final double fadeOffset = 1 / drawingSpeed;
+	final double rectFadingSpeed = 1 / drawingSpeed * 3;
 
 	final int maxSteps = 1000;
 	// density of winding
@@ -590,9 +590,9 @@ public class SpiralCollision extends Application {
 				if (DEBUG_DRAW) currentTestRect = addTestRectangleToTestRectCloud(canvas_x, canvas_y, width, height, null);
 
 				if (direction[DIRECTION_X])
-					crossedXAxis = Math.signum(prev_x) != Math.signum(x);
+					crossedXAxis = Math.signum(prev_x + width / 2) != Math.signum(x + width / 2);
 				if (direction[DIRECTION_Y])
-					crossedYAxis = Math.signum(prev_y) != Math.signum(y);
+					crossedYAxis = Math.signum(prev_y - height / 2) != Math.signum(y - height / 2);
 
 				if (DEBUG_DRAW) {
 					// debug draw location on FineTuningCanvas
@@ -743,7 +743,7 @@ public class SpiralCollision extends Application {
 			x = CanvasToCartesianX(x0, canvas_x);
 			y = CanvasToCartesianY(y0, canvas_y);
 
-			// Calc pitch 
+			// Calculate pitch 
 			len = Math.hypot(x, y);
 
 			// pitch normalized, x and y components 
@@ -917,13 +917,13 @@ public class SpiralCollision extends Application {
 			fileEventHandler.init(scene_width / 2,
 					scene_height / 2 /* center location of first item of the collision spiral */
 					);
-			KeyFrame fileKeyFrame = new KeyFrame(Duration.millis(drawingSpeed), fileEventHandler);
+			KeyFrame fileKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), fileEventHandler);
 
-			KeyFrame spiralPositionKeyFrame = new KeyFrame(Duration.millis(drawingSpeed), spiralEventHandler);
+			KeyFrame spiralPositionKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), spiralEventHandler);
 
-			KeyFrame orientationKeyFrame = new KeyFrame(Duration.millis(drawingSpeed), orientationEventHandler);
+			KeyFrame orientationKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), orientationEventHandler);
 
-			KeyFrame finePositionKeyFrame = new KeyFrame(Duration.millis(drawingSpeed), fineTuningEventHandler);
+			KeyFrame finePositionKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), fineTuningEventHandler);
 
 			fileTimeline.getKeyFrames().add(fileKeyFrame);
 			fileTimeline.setCycleCount(Timeline.INDEFINITE);
