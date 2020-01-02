@@ -3,7 +3,7 @@
 // Note that this uses a timeline to animate the zoom. 
 // If you don't want this, you can call node.setTranslateX(...), node.setScaleX(...), etc. directly.
 
-package Application;
+package application;
 
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
