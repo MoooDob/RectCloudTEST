@@ -124,7 +124,7 @@ public class SpiralCollision extends Application {
 	private final FileEventHandler fileEventHandler = new FileEventHandler();
 	private final SpiralEventHandler spiralEventHandler = new SpiralEventHandler();
 	private final OrientationEventHandler orientationEventHandler = new OrientationEventHandler();
-	private final FineTuningEventHandler fineTuningEventHandler = new FineTuningEventHandler();
+	private final FinePositioningEventHandler fineTuningEventHandler = new FinePositioningEventHandler();
 
 	private Canvas spiralCanvas; // set in "start'
 	private final Pane testRectCloud = new Pane();
@@ -521,7 +521,7 @@ public class SpiralCollision extends Application {
 		}
 	}
 
-	private class FineTuningEventHandler implements EventHandler<ActionEvent> {
+	private class FinePositioningEventHandler implements EventHandler<ActionEvent> {
 
 		private static final int DIRECTION_X = 0;
 		private static final int DIRECTION_Y = 1;
@@ -739,21 +739,28 @@ public class SpiralCollision extends Application {
 			direction[DIRECTION_Y] = true;
 			fineTuningDirectionStep = 0;
 
-			// convert canvas to Cartesian coordinates, x0 and y0 is the center point
+			// convert canvas coordinates to Cartesian coordinates, x0 and y0 is the center point
 			x = CanvasToCartesianX(x0, canvas_x);
 			y = CanvasToCartesianY(y0, canvas_y);
+			if (DEBUG_PRINT) System.out.println(String.format("     canvas_x= %.2f canvas_y= %.2f", canvas_x, canvas_y));
+			if (DEBUG_PRINT) System.out.println(String.format("     x= %.2f y= %.2f", x, y));
 
-			// Calculate pitch 
-			len = Math.hypot(x, y);
+			// calculate center point of the rectangle
+			double center_x = x + width / 2;
+			double center_y = y - height / 2;
+			
+			// Calculate length of the vector between center point of the rectangle 
+			// and the origin of the Cartesian coordinates (0,0) 
+			len = Math.hypot(center_x, center_y); // = sqrt(center_x², center_y²)
 
-			// pitch normalized, x and y components 
-			nx = x / len;
-			ny = y / len;
+			// center vector normalized, x and y components 
+			nx = center_x / len;
+			ny = center_y / len;
 
 			offset_x = nx * fineTuningIncrementRate;
 			offset_y = ny * fineTuningIncrementRate;
 
-			if (DEBUG_PRINT) System.out.println(String.format("     dx= %.2f dy= %.2f", offset_x, offset_y));
+			if (DEBUG_PRINT) System.out.println(String.format("     offset_x= %.2f offset_y= %.2f", offset_x, offset_y));
 
 			// clear canvas
 			FineTuningCanvas.getGraphicsContext2D().clearRect(0, 0, FineTuningCanvas.getWidth(),
@@ -914,15 +921,15 @@ public class SpiralCollision extends Application {
 				}
 			});
 
+			
+			if (DEBUG_PRINT) System.out.println("Center point: "+ (scene_width / 2) + "/" + (scene_height / 2));
+			
 			fileEventHandler.init(scene_width / 2,
 					scene_height / 2 /* center location of first item of the collision spiral */
 					);
 			KeyFrame fileKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), fileEventHandler);
-
 			KeyFrame spiralPositionKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), spiralEventHandler);
-
 			KeyFrame orientationKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), orientationEventHandler);
-
 			KeyFrame finePositionKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), fineTuningEventHandler);
 
 			fileTimeline.getKeyFrames().add(fileKeyFrame);
