@@ -22,8 +22,10 @@ public class SpiralInfo {
 	public void appendSpiralPoint(SpiralPoint spiralpoint) {
 		spiralpoints.add(spiralpoint);
 		// Update 'last' informations if necessary
-		latestIndex = Math.max(latestIndex, spiralpoint.index);
-		latestX = Math.max(latestX, spiralpoint.x);
-		latestY = Math.max(latestY, spiralpoint.y);
+		if (spiralpoint.index > latestIndex) {
+			latestIndex = spiralpoint.index;
+			latestX = spiralpoint.x;
+			latestY = spiralpoint.y;
+		}
 	}	
 }

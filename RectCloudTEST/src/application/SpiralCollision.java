@@ -42,6 +42,7 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
 import javafx.scene.shape.Rectangle;
 import javafx.animation.Animation.Status;
 
@@ -57,11 +58,11 @@ public class SpiralCollision extends Application {
 	final double defaultWidth = 12;
 	final double defaultHeight = 12;
 
-	public long seed = 324;
+	public static long seed = 324;
 
 	final double drawingSpeed = 0.1f;
 	final double fadeOffset = drawingSpeed;
-	final double rectFadingSpeed = drawingSpeed * 5;
+	final double rectFadingSpeed = drawingSpeed * 3;
 
 	final int maxSteps = 1000;
 	// density of winding
@@ -81,7 +82,8 @@ public class SpiralCollision extends Application {
 	// man number of steps for fine tuning
 	public int maxFineTuningSteps = 100;
 	
-	public final static boolean DRAW_DEBUG = false;
+	public final static boolean DEBUG_DRAW = true;
+	public final static boolean DEBUG_PRINT = true;
 
 	// Files with this extension will be shown, null or empty array => all files 
 	final String[] fileExtensionFilter = {}; // {"java"}; // {"java", "cpp", "h"} // null /*=> all*/
@@ -112,7 +114,7 @@ public class SpiralCollision extends Application {
 	private final int numRectOrientationsAndAlignments = 4;
 	private Rectangle[] testRects = new Rectangle[numRectOrientationsAndAlignments + 1];
 
-	private final Random randomizer = new Random(seed);
+	private final static Random randomizer = new Random(seed);
 
 	private Timeline fileTimeline = new Timeline();
 	private Timeline spiralPositionTimeline = new Timeline();
@@ -175,11 +177,11 @@ public class SpiralCollision extends Application {
 				// set Info label
 				String info = "find location for file " + filename + " width: " + fileWidth + " height: "
 						+ fileHeight;
-				// System.out.println(info);
+				if (DEBUG_PRINT) System.out.println(info);
 				label.setText(info);
 
-//				System.out.println("fileindex: " + fileIndex + " out of 0.." + (numFiles - 1) + " (" + filename + ", "
-//						+ fileWidth + " x " + fileHeight + ")");
+				if (DEBUG_PRINT) System.out.println("fileindex: " + fileIndex + " out of 0.." + (numFiles - 1) + " (" + filename + ", "
+						+ fileWidth + " x " + fileHeight + ")");
 				spiralEventHandler.init(x0, y0);
 				fileTimeline.pause();
 				spiralPositionTimeline.play();
@@ -203,6 +205,8 @@ public class SpiralCollision extends Application {
 
 		private void OnFinished() {
 			System.out.println("finished.");
+			spiralFader.playFromStart();
+			FineTuningFader.playFromStart();
 		}
 
 	}
@@ -231,13 +235,15 @@ public class SpiralCollision extends Application {
 		public void handle(ActionEvent event) {
 
 			spiralPositionTimeline.pause();
-			
+						
 			currentSpiralPoint = null;
 			
 			if (spiralPointIterator != null) {
 				
 				boolean hasNextPoint;
 				// remove all pending remove spiral points
+				// (pending remove spiral points are necessary because adding and 
+				// removing on an iterator is not so easy because of concurrency)				
 				while ((hasNextPoint = spiralPointIterator.hasNext()) 
 						&& (currentSpiralPoint = spiralPointIterator.next()).pendingRemove
 						) {
@@ -250,10 +256,10 @@ public class SpiralCollision extends Application {
 					y = currentSpiralPoint.y;
 					spiralIndex = currentSpiralPoint.index;
 					
-//					System.out.println(String.format(
-//							Locale.US, 
-//							"  got point %d @ %.2f/%.2f",
-//							spiralIndex, x, y));
+					if (DEBUG_PRINT) System.out.println(String.format(
+							Locale.US, 
+							"  got point %d @ %.2f/%.2f",
+							spiralIndex, x, y));
 				} else currentSpiralPoint = null;
 				
 			}
@@ -279,17 +285,12 @@ public class SpiralCollision extends Application {
 					x = prev_x - prev_y / h;
 					y = prev_y + prev_x / h;
 					
+				// create and append new spiral point, update the 'latest' fields accordingly 
 				currentSpiralPoint = new SpiralPoint(spiralIndex, x, y);
 				currentSpiral.appendSpiralPoint(currentSpiralPoint);
 				spiralPointIterator = null;
 				
-				// set latest values
-				currentSpiral.latestIndex = spiralIndex;
-				currentSpiral.latestX = x;
-				currentSpiral.latestY = y;
-
-				
-				// System.out.println("  created and appended new spiral point " + spiralIndex + " @ " + x + "/" + y);
+				if (DEBUG_PRINT) System.out.println("  created and appended new spiral point " + spiralIndex + " @ " + x + "/" + y);
 
 			} else {
 				//spiralIndex larger then the stored highest index: this should never happen!
@@ -297,7 +298,7 @@ public class SpiralCollision extends Application {
 
 
 			// Draw spiral, center point
-			if (DRAW_DEBUG) {
+			if (DEBUG_DRAW) {
 				spiralCanvas.getGraphicsContext2D().strokeLine(CartesianToCanvasX(x0, x), CartesianToCanvasY(y0, y),
 					CartesianToCanvasX(x0, prev_x), CartesianToCanvasY(y0, prev_y));
 				spiralCanvas.getGraphicsContext2D().fillOval(CartesianToCanvasX(x0, x) - 5 / 2,
@@ -305,11 +306,11 @@ public class SpiralCollision extends Application {
 			}
 
 			if (maxSpiralPositions > 0 && spiralIndex >= maxSpiralPositions) {
-//				System.out.println("  file '" + fileEventHandler.filename + "': collision in more than "
-//						+ maxSpiralPositions + " spiral positions, canceled. Next file.");
+				System.out.println("  file '" + fileEventHandler.filename + "': collision in more than "
+						+ maxSpiralPositions + " spiral positions, canceled. Next file.");
 				OnFinished();
 			} else {
-				// System.out.println("  spiral point " + spiralIndex + " x=" + x + " y=" + y);
+				if (DEBUG_PRINT) System.out.println("  ->test spiral point " + spiralIndex + " (variant: " + variant + ") x=" + x + " y=" + y);
 				orientationEventHandler.init(x0, y0, x, y);
 				orientationAndAlignmentTimeline.play();
 			}
@@ -324,13 +325,11 @@ public class SpiralCollision extends Application {
 			prev_x = 0;
 			prev_y = 0;
 
-			//variant++;
+			variant++;
 			if (variant < 0 || variant >= numOfSpiralVariants) {
 				variant = 0;
 			} 
-
-			// there should always be a first key in the LinkedList!
-			//			spiralStep = spirals[startOrientation].getFirstPoint().nr;
+			if (DEBUG_PRINT) System.out.println("  spiral variant: " + variant);
 
 			currentSpiral = spirals[variant];
 			spiralPointIterator = currentSpiral.spiralpoints.listIterator();
@@ -348,6 +347,7 @@ public class SpiralCollision extends Application {
 
 		}
 
+		
 		private void OnFinished() {
 			spiralPositionTimeline.stop();
 
@@ -355,6 +355,7 @@ public class SpiralCollision extends Application {
 			fileTimeline.play();
 		}
 
+		
 	}
 
 	private class OrientationEventHandler implements EventHandler<ActionEvent> {
@@ -374,34 +375,43 @@ public class SpiralCollision extends Application {
 			
 			orientationAndAlignmentTimeline.pause();
 			
-//			System.out.println(
-//					"    Orientation " + orientationIndex + " out of 0.." + (numRectOrientationsAndAlignments + 1 - 1));
+			if (DEBUG_PRINT) System.out.println(
+					"    Orientation " + orientationIndex + " out of 0.." + (numRectOrientationsAndAlignments + 1 - 1));
 
 			Rectangle currentTestRect = testRects[orientationIndex];
-			if (DRAW_DEBUG) addTestRectangleToTestRectCloud(currentTestRect.getX(), currentTestRect.getY(), currentTestRect.getWidth(),
-					currentTestRect.getHeight(), null /* use default color */
-					);
+			if (DEBUG_DRAW) addTestRectangleToTestRectCloud(
+					currentTestRect.getX(), 
+					currentTestRect.getY(), 
+					currentTestRect.getWidth(),
+					currentTestRect.getHeight(), 
+					null /* use default color */
+			);
 
-//			System.out.print(String.format("    test " + (orientationIndex == 4 ? "square" : "rect")+ " x= %.2f y= %.2f w= %.2f h= %.2f : ", currentTestRect.getX(),
-//					currentTestRect.getY(), currentTestRect.getWidth(), currentTestRect.getHeight()));
+			if (DEBUG_PRINT) System.out.print(String.format("    test " + (orientationIndex == 4 ? "square" : "rect")+ " x= %.2f y= %.2f w= %.2f h= %.2f : ", 
+					currentTestRect.getX(),
+					currentTestRect.getY(), 
+					currentTestRect.getWidth(), 
+					currentTestRect.getHeight()
+			));
 
-			// check collision
-
-			boolean collision = true;
+			
+			// check collision ...
+			boolean collision = false;
+			// .. but only if necessary ( no smaller rect tested before on this position) 
 			if (orientationIndex < numRectOrientationsAndAlignments) {
 				Dimension currentStoredMinimalTestDimensions = spiralEventHandler.currentSpiralPoint.testOrientations[orientationIndex];
-				collision  = currentStoredMinimalTestDimensions.width < currentTestRect.getWidth()
-						|| currentStoredMinimalTestDimensions.height < currentTestRect.getHeight();	
+				collision  = currentTestRect.getWidth() > currentStoredMinimalTestDimensions.width 
+						|| currentTestRect.getHeight() > currentStoredMinimalTestDimensions.height;	
 			}
-			
+			if (DEBUG_PRINT) System.out.print(collision ? "fast collision - ":"no fast collision - ");
+
 			if ( ! collision ) {
 				// collision check is necessary because previously checked testRects were always bigger (bigger width and bigger height) 
 				collision = checkCollisonAABB(currentTestRect.getX(), currentTestRect.getY(),
 						currentTestRect.getWidth(), currentTestRect.getHeight());
 			}
-	
-
-			// System.out.println(collision ? "collision":"no collision");
+			if (DEBUG_PRINT) System.out.println(collision ? "collision":"no collision");
+			
 			if ( ! collision ) {
 				// collision free position found
 
@@ -430,7 +440,7 @@ public class SpiralCollision extends Application {
 				} else {
 					// orientationIndex == 4 => minimal test square collision
 					// remove spiralInfo for this spiral coordinate to mark this point as not to be checked any more in future
-					// System.out.println("    -> remove spiral point");
+					if (DEBUG_PRINT) System.out.println("    -> remove spiral point");
 					spiralEventHandler.currentSpiralPoint.pendingRemove = true;
 				}
 			}	
@@ -464,39 +474,44 @@ public class SpiralCollision extends Application {
 			
 			// portrait rectangle, center point
 			testRects[0] = new Rectangle( 
-					x0 + x - rectWidth / 2, 
-					y0 + y - rectHeight / 2, 
+					CartesianToCanvasX(x0, x) - rectWidth / 2, 
+					CartesianToCanvasY(y0, y) - rectHeight / 2, 
 					rectWidth, 
 					rectHeight
 			); 
 			
 			// landscape rectangle, center point
 			testRects[1] = new Rectangle(
-					x0 + x - rectHeight / 2, 
-					y0 + y - rectWidth / 2, 
+					CartesianToCanvasX(x0, x) - rectHeight / 2, 
+					CartesianToCanvasY(y0, y) - rectWidth / 2, 
 					rectHeight, 
 					rectWidth
 			); 
 
 			testRects[2] = new Rectangle(
-					x0 + x - (x < 0 ? rectWidth : 0), 
-					y0 + y - (y < 0 ? rectHeight : 0), 
+					CartesianToCanvasX(x0, x) - (x < 0 ? rectWidth : 0), 
+					CartesianToCanvasY(y0, y) - (y > 0 ? rectHeight : 0), 
 					rectWidth,
 					rectHeight
 			);
 			testRects[3] = new Rectangle(
-					x0 + x - (x < 0 ? rectHeight : 0), 
-					y0 + y - (y < 0 ? rectWidth : 0),
+					CartesianToCanvasX(x0, x) - (x < 0 ? rectHeight : 0), 
+					CartesianToCanvasY(y0, y) - (y > 0 ? rectWidth : 0),
 					rectHeight, 
 					rectWidth
 			);
 
 			// minimal test square with center pivot for testing the general collision on this point
-			testRects[4] = new Rectangle(x0 + x - 0.5, y0 + y - 0.5, 1, 1);
+			testRects[4] = new Rectangle(
+					CartesianToCanvasX(x0, x) - 0.5, 
+					CartesianToCanvasY(y0, y) - 0.5, 
+					1, 
+					1
+			);
 
 			// Shuffle testRects to get a random orientation/alignment
 			shuffleArrayDurstenfeld(testRects, 0, 1);
-			shuffleArrayDurstenfeld(testRects, 2, testRects.length - 1); // without minimal test square
+			shuffleArrayDurstenfeld(testRects, 2, testRects.length - 2); // without minimal test square
 		}
 
 		private void OnFinished() {
@@ -550,13 +565,13 @@ public class SpiralCollision extends Application {
 			boolean toMuchFineTuningSteps = fineTuningStep >= maxFineTuningSteps;
 			if (toMuchFineTuningSteps) {
 				// takes longer than expected
-//				System.out.println("      fine tuning needed more than " + maxFineTuningSteps
-//						+ " to find a better location, canceled. Use last good.");
+				System.out.println("      fine tuning needed more than " + maxFineTuningSteps
+						+ " to find a better location, canceled. Use last good.");
 			} else {
 				// check collision
 
 				//finePositioningTimeline.pause();
-				// System.out.println("      Fine tuning step " + fineTuningStep + " out of 0.." + (maxFineTuningSteps - 1));
+				if (DEBUG_PRINT) System.out.println("      Fine tuning step " + fineTuningStep + " out of 0.." + (maxFineTuningSteps - 1));
 
 				// store last good location
 				prev_x = x;
@@ -567,23 +582,25 @@ public class SpiralCollision extends Application {
 					x = prev_x - offset_x;
 				if (direction[DIRECTION_Y])
 					y = prev_y - offset_y;
-				// System.out.println(String.format("       %s x= %.2f %s y= %.2f ", direction[DIRECTION_X] ? "new":"old",x, direction[DIRECTION_Y] ? "new":"old",y));
+				if (DEBUG_PRINT) System.out.println(String.format("       %s x= %.2f %s y= %.2f ", direction[DIRECTION_X] ? "new":"old",x, direction[DIRECTION_Y] ? "new":"old",y));
 
 				// create new test rectangle
 				canvas_x = CartesianToCanvasX(x0, x);
 				canvas_y = CartesianToCanvasY(y0, y);
-				if (DRAW_DEBUG) currentTestRect = addTestRectangleToTestRectCloud(canvas_x, canvas_y, width, height, null);
+				if (DEBUG_DRAW) currentTestRect = addTestRectangleToTestRectCloud(canvas_x, canvas_y, width, height, null);
 
 				if (direction[DIRECTION_X])
 					crossedXAxis = Math.signum(prev_x) != Math.signum(x);
 				if (direction[DIRECTION_Y])
 					crossedYAxis = Math.signum(prev_y) != Math.signum(y);
 
-				// debug draw location on FineTuningCanvas
-				double prev_canvas_x = CartesianToCanvasX(x0, x);
-				double prev_canvas_y = CartesianToCanvasY(y0, y);
-				FineTuningCanvas.getGraphicsContext2D().strokeLine(prev_canvas_x, prev_canvas_y, canvas_x, canvas_y);
-				FineTuningCanvas.getGraphicsContext2D().fillOval(canvas_x - 5 / 2, canvas_y - 5 / 2, 5, 5);
+				if (DEBUG_DRAW) {
+					// debug draw location on FineTuningCanvas
+					double prev_canvas_x = CartesianToCanvasX(x0, x);
+					double prev_canvas_y = CartesianToCanvasY(y0, y);
+					FineTuningCanvas.getGraphicsContext2D().strokeLine(prev_canvas_x, prev_canvas_y, canvas_x, canvas_y);
+					FineTuningCanvas.getGraphicsContext2D().fillOval(canvas_x - 5 / 2, canvas_y - 5 / 2, 5, 5);
+				}
 
 				// check collision at new location 
 				collision = checkCollisonAABB(canvas_x, canvas_y, width, height);
@@ -596,14 +613,43 @@ public class SpiralCollision extends Application {
 
 				// debug output
 				ArrayList<String> sl = new ArrayList<String>();
-				if (collision) sl.add("collision");
-				if (crossedXAxis) sl.add("crossed x axis");
-				if (crossedYAxis) sl.add("crossed y axis");
+				if (collision) {
+					sl.add("collision"); 	
+					if (DEBUG_DRAW) {
+						Paint fill = FineTuningCanvas.getGraphicsContext2D().getFill();
+						FineTuningCanvas.getGraphicsContext2D().setFill(Color.RED);
+						FineTuningCanvas.getGraphicsContext2D().fillOval(canvas_x - 5 / 2, canvas_y - 5 / 2, 5, 5);
+						FineTuningCanvas.getGraphicsContext2D().setFill(fill);
+						currentTestRect.setStroke(Color.RED);
+					}
+				}
+
+				if (crossedXAxis) {
+					sl.add("crossed x axis"); 			
+					if (DEBUG_DRAW) {
+						Paint fill = FineTuningCanvas.getGraphicsContext2D().getFill();
+						FineTuningCanvas.getGraphicsContext2D().setFill(Color.ORANGE);
+						FineTuningCanvas.getGraphicsContext2D().fillOval(canvas_x - 5 / 2, canvas_y - 5 / 2, 5, 5);
+						FineTuningCanvas.getGraphicsContext2D().setFill(fill);
+						currentTestRect.setStroke(Color.ORANGE);
+					}
+				}
+
+				if (crossedYAxis) {
+					sl.add("crossed y axis");
+					if (DEBUG_DRAW) {
+						Paint fill = FineTuningCanvas.getGraphicsContext2D().getFill();
+						FineTuningCanvas.getGraphicsContext2D().setFill(Color.ORANGE);
+						FineTuningCanvas.getGraphicsContext2D().fillOval(canvas_x - 5 / 2, canvas_y - 5 / 2, 5, 5);
+						FineTuningCanvas.getGraphicsContext2D().setFill(fill);
+						currentTestRect.setStroke(Color.ORANGE);
+					}
+				}
 				if (toMuchFineTuningSteps) sl.add("to much fine tuning steps");
 				sl.stream().collect(Collectors.joining(" and "));
-				// System.out.println("      -> " + String.join(" and ", sl) + String.format(Locale.US, "! Reset to last good: %.2f/%.2f", prev_x, prev_y));
+				if (DEBUG_PRINT) System.out.println("      -> " + String.join(" and ", sl) + String.format(Locale.US, "! Reset to last good: %.2f/%.2f", prev_x, prev_y));
 				
-				if (DRAW_DEBUG) if (collision)
+				if (DEBUG_DRAW) if (collision)
 					currentTestRect.setStroke(Color.RED);
 
 				x = prev_x;
@@ -627,7 +673,7 @@ public class SpiralCollision extends Application {
 						// already crossed axis in selected direction --> next step
 						fineTuningDirectionStep++;
 					} else {
-						// System.out.println("       try again in " + (direction[DIRECTION_X] ? "X direction" : "Y direction"));
+						if (DEBUG_PRINT) System.out.println("       try again in " + (direction[DIRECTION_X] ? "X direction" : "Y direction"));
 					}
 
 				}
@@ -640,7 +686,7 @@ public class SpiralCollision extends Application {
 						// already crossed axis in selected direction --> next step
 						fineTuningDirectionStep++;
 					} else {
-						// System.out.println("       try again in " + (direction[DIRECTION_X] ? "X direction" : "Y direction"));
+						if (DEBUG_PRINT) System.out.println("       try again in " + (direction[DIRECTION_X] ? "X direction" : "Y direction"));
 					}
 
 				}
@@ -655,7 +701,7 @@ public class SpiralCollision extends Application {
 						if (spirals[spiralEventHandler.variant].spiralpoints.contains(spiralEventHandler.currentSpiralPoint)
 								&& spirals[spiralEventHandler.variant].spiralpoints.size() > 1) {
 							// remove spiral point to mark this spiral location is already occupied
-							// System.out.println("    -> remove spiral point");
+							if (DEBUG_PRINT) System.out.println("    -> remove spiral point");
 							spiralEventHandler.currentSpiralPoint.pendingRemove = true;
 						}
 					}					
@@ -707,7 +753,7 @@ public class SpiralCollision extends Application {
 			offset_x = nx * fineTuningIncrementRate;
 			offset_y = ny * fineTuningIncrementRate;
 
-			// System.out.println(String.format("     dx= %.2f dy= %.2f", offset_x, offset_y));
+			if (DEBUG_PRINT) System.out.println(String.format("     dx= %.2f dy= %.2f", offset_x, offset_y));
 
 			// clear canvas
 			FineTuningCanvas.getGraphicsContext2D().clearRect(0, 0, FineTuningCanvas.getWidth(),
@@ -719,20 +765,6 @@ public class SpiralCollision extends Application {
 			finePositioningTimeline.stop();
 			// next file (no init)
 			fileTimeline.play();
-
-			// FineTuningCanvas Fading					
-			FineTuningFader = new FadeTransition(Duration.millis(rectFadingSpeed), FineTuningCanvas);
-			FineTuningFader.setFromValue(1.0);
-			FineTuningFader.setToValue(0);
-			FineTuningFader.setCycleCount(1);
-			FineTuningFader.setDelay(new Duration(fadeOffset));
-			FineTuningFader.setOnFinished(new EventHandler<ActionEvent>() {
-				@Override
-				public void handle(ActionEvent event) {
-					// remove faded rect from testRectCloud
-					testRectCloud.getChildren().remove(((FadeTransition) event.getSource()).getNode());
-				}
-			});
 			FineTuningFader.play();
 
 		}
@@ -749,12 +781,12 @@ public class SpiralCollision extends Application {
 		fileWalker.setCycleCount(1);
 		// fileWalker.setDelay(Duration.millis(2000));
 		fileWalker.setDuration(Duration.millis(2000));
-		// System.out.println("Rate: " + fileWalker.getRate());
+		if (DEBUG_PRINT) System.out.println("Rate: " + fileWalker.getRate());
 		fileWalker.setAction(new EventHandler<ActionEvent>() {
 
 			@Override
 			public void handle(ActionEvent event) {
-				// System.out.println("setAction " + event);
+				if (DEBUG_PRINT) System.out.println("setAction " + event);
 			}
 
 		});
@@ -787,7 +819,7 @@ public class SpiralCollision extends Application {
 
 		if (selectedDirectory == null) {
 			label.setText("No directory selected. Terminated.");
-			// System.out.println(label.getText());
+			if (DEBUG_PRINT) System.out.println(label.getText());
 		} else {
 
 			// Adding Title to the stage
@@ -859,19 +891,9 @@ public class SpiralCollision extends Application {
 					if (fileTimeline.getStatus() == Status.PAUSED && spiralPositionTimeline.getStatus() == Status.PAUSED
 							&& orientationAndAlignmentTimeline.getStatus() == Status.PAUSED
 							&& finePositioningTimeline.getStatus() == Status.PAUSED) {
-						// Fading SpiralCanvas
-						spiralFader = new FadeTransition(Duration.millis(3000), spiralCanvas);
-						spiralFader.setFromValue(1.0);
-						spiralFader.setToValue(0.0);
-						spiralFader.setCycleCount(1);
-						spiralFader.play();
+						spiralFader.playFromStart();
 
-						// Fading FineTuningCanvas
-						FineTuningFader = new FadeTransition(Duration.millis(3000), FineTuningCanvas);
-						FineTuningFader.setFromValue(1.0);
-						FineTuningFader.setToValue(0.0);
-						FineTuningFader.setCycleCount(1);
-						FineTuningFader.play();
+						FineTuningFader.playFromStart();
 					}
 				}
 			});
@@ -918,6 +940,38 @@ public class SpiralCollision extends Application {
 			finePositioningTimeline.getKeyFrames().add(finePositionKeyFrame);
 			finePositioningTimeline.setCycleCount(Timeline.INDEFINITE);
 			finePositioningTimeline.setAutoReverse(false);
+			
+			
+			
+			// Prepare Fader
+			
+			// Prepare Fading SpiralCanvas
+			spiralFader = new FadeTransition(Duration.millis(3000), spiralCanvas);
+			spiralFader.setFromValue(1.0);
+			spiralFader.setToValue(0.0);
+			spiralFader.setCycleCount(1);
+			
+			// Prepare FineTuningCanvas Fading					
+			FineTuningFader = new FadeTransition(Duration.millis(rectFadingSpeed), FineTuningCanvas);
+			FineTuningFader.setFromValue(1.0);
+			FineTuningFader.setToValue(0);
+			FineTuningFader.setCycleCount(1);
+			FineTuningFader.setDelay(new Duration(fadeOffset));
+			FineTuningFader.setOnFinished(new EventHandler<ActionEvent>() {
+				@Override
+				public void handle(ActionEvent event) {
+					// remove faded rectangle from testRectCloud
+					testRectCloud.getChildren().remove(((FadeTransition) event.getSource()).getNode());
+				}
+			});
+
+			// Prepare fading of FineTuningCanvas
+			FineTuningFader = new FadeTransition(Duration.millis(3000), FineTuningCanvas);
+			FineTuningFader.setFromValue(1.0);
+			FineTuningFader.setToValue(0.0);
+			FineTuningFader.setCycleCount(1);
+			
+			
 
 			// Set start locations for the spirals in spiral point 0
 			SpiralPoint.init(numRectOrientationsAndAlignments);
@@ -1019,16 +1073,9 @@ public class SpiralCollision extends Application {
 				width, height, 0 /* depth, unused */
 				);
 
-		//		System.out.println("center of spiral x= " + x + ", y= " + y );
-		//		System.out.println("dimensions of new rect: width= " + rectWidth + ", height= " + rectHeight);
-		//		
-		//		System.out.println(String.format("check collision of new rect @ x= %.2f y= %.2f width= %.2f height= %.2f against all " + RectCloud.getChildren().size() + " already positioned rects.",
-		//				currentTestRect.getX(),
-		//				currentTestRect.getY(),
-		//				currentTestRect.getWidth(),
-		//				currentTestRect.getHeight()
-		//		));
-
+//		if (DEBUG_PRINT) System.out.println("center of spiral x= " + canvas_x + ", y= " + canvas_y );
+//		if (DEBUG_PRINT) System.out.println("dimensions of new rect: width= " + width + ", height= " + height);
+		
 		// ... and check each for collision with all previously created rectangles
 		boolean anyCollisions = false;
 		for (Node r : rectCloud.getChildren()) {
@@ -1036,19 +1083,19 @@ public class SpiralCollision extends Application {
 			if (r == null)
 				break;
 
-			//			System.out.print(String.format("  against rect @ x= %.0f y= %.0f width= %.0f height= %.0f   ",
-			//					((Rectangle)r).getX(),
-			//					((Rectangle)r).getY(),
-			//					((Rectangle)r).getWidth(),
-			//					((Rectangle)r).getHeight()
-			//			));
+//			if (DEBUG_PRINT) System.out.print(String.format("  against rect @ x= %.0f y= %.0f width= %.0f height= %.0f   ",
+//					((Rectangle)r).getX(),
+//					((Rectangle)r).getY(),
+//					((Rectangle)r).getWidth(),
+//					((Rectangle)r).getHeight()
+//			));
 
 			// getBoundsInLocal is only correct if and only if both objects are in the same coordinate system. 
 			// if one object is for instance part of another group, the coordinate system have to be transformed
 			// furthermore this function tests only the AABB (axis aligned bounding box) of both objects, 
 			// so rotated will be approximated with its AABB
 			boolean collision = r.intersects(bounds);
-			//			System.out.println(collision ? "collision" : "no collision");
+			//if (DEBUG_PRINT) System.out.println(collision ? "collision" : "no collision");
 
 			anyCollisions |= collision;
 
@@ -1059,9 +1106,13 @@ public class SpiralCollision extends Application {
 
 	/**
 	 * Shuffle array (Durstenfeld shuffle, implementation for Fishes-Yates shuffle
-	 * based on https://stackoverflow.com/a/1520212 seems (according to ) the an
-	 * Fisher-Yates shuffle, exactly the Durstenfeld inplace shuffle implementation
+	 * based on https://stackoverflow.com/a/1520212 seems (according to https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm) a
+	 * Fisher-Yates shuffle, exactly the 'Durstenfeld inplace' shuffle implementation
 	 * (Fisher–Yates shuffle)
+	 * 
+	 * For small arrays (two items) the original shuffle will shuffle always the same way, so the result is predictable.
+	 * Here it is extended by a random factor which decides if a swap has to occur.
+	 *  
 	 * 
 	 * @param the array to be shuffled
 	 */
@@ -1072,13 +1123,14 @@ public class SpiralCollision extends Application {
 	 * @param to
 	 */
 	private static <T> void shuffleArrayDurstenfeld(T[] testRects, int from, int to) {
-		Random rand = new Random(25);
-		for (int i = testRects.length - 1 - to; i > from; i--) {
-			int index = rand.nextInt(i + 1);
-			// Simple swap two entries
-			T a = testRects[index];
-			testRects[index] = testRects[i];
-			testRects[i] = a;
+		for (int i = to; i > from; i--) {
+			int index = from + randomizer.nextInt(i - from);
+			// Simply swap two entries if a random number is greater than a threshold
+			if (randomizer.nextFloat() > 0.5) {
+				T a = testRects[index];
+				testRects[index] = testRects[i];
+				testRects[i] = a;
+			}
 		}
 	}
 
@@ -1105,7 +1157,7 @@ public class SpiralCollision extends Application {
 			radius += deltaR;
 			x = x0 + radius * Math.cos((2 * Math.PI * step / (radius * 10)) * spinRate);
 			y = y0 + radius * Math.sin((2 * Math.PI * step / (radius * 10)) * spinRate);
-			if (DRAW_DEBUG) {
+			if (DEBUG_DRAW) {
 				spiralGC.strokeLine(x, y, x1, y1);
 				spiralGC.fillOval(x - 5 / 2, y - 5 / 2, 5, 5);
 			}
@@ -1120,11 +1172,11 @@ public class SpiralCollision extends Application {
 	private int visitDirectory(File directory, int level, float minHue, float maxHue) {
 
 		int numOfLevels = level;
-		//			System.out.println(directory.getAbsolutePath() + 
-		//					" L: " + level + 
-		//					" min_ab: " + min_ab + 
-		//					" max_ab: " + max_ab
-		//			);	
+//		if (DEBUG_PRINT) System.out.println(directory.getAbsolutePath() + 
+//				" L: " + level + 
+//				" minHue: " + minHue + 
+//				" maxHue: " + maxHue
+//		);	
 
 		// Filter
 		String[] childFilesAndDirectories = directory.list(new FilenameFilter() {
@@ -1158,11 +1210,11 @@ public class SpiralCollision extends Application {
 		float partHue = deltaHue / numOfChildDirectories;
 		float hueOfDirectory = (maxHue + minHue) / 2; // center of current hue color range
 
-		//			System.out.println(directory.getAbsolutePath() + " deltaHue: " + deltaHue + 
-		//					" num: " + numOfChildDirectories + 
-		//					" partHue: " + partHue + 
-		//					" dirHue:" + hueOfDirectory
-		//			);
+//		if (DEBUG_PRINT) System.out.println(directory.getAbsolutePath() + " deltaHue: " + deltaHue + 
+//				" num: " + numOfChildDirectories + 
+//				" partHue: " + partHue + 
+//				" dirHue:" + hueOfDirectory
+//		);
 
 		int childDirectoriesCounter = 0;
 
@@ -1174,10 +1226,10 @@ public class SpiralCollision extends Application {
 				float currentMinHue = minHue + childDirectoriesCounter * partHue;
 				float currentMaxHue = minHue + childDirectoriesCounter * partHue + partHue;
 
-				//				System.out.println(" " + fileOrDirectory.getAbsolutePath() + 
-				//						" current_min_ab: " + current_min_ab + 
-				//						" current_max_ab: " + current_max_ab
-				//				);
+//				if (DEBUG_PRINT) System.out.println(" " + fileOrDirectory.getAbsolutePath() + 
+//						" currentMinHue: " + currentMinHue + 
+//						" currentMaxHue: " + currentMaxHue
+//				);
 
 				numOfLevels = Math.max(numOfLevels,
 						visitDirectory(fileOrDirectory, level + 1, currentMinHue, currentMaxHue));
@@ -1267,28 +1319,28 @@ public class SpiralCollision extends Application {
 		newRect.setFill(parentDirectoryColor);
 		Tooltip.install(newRect, new Tooltip(fileEventHandler.filename));
 		rectCloud.getChildren().add(newRect);
-		//	    			System.out.println(String.format("rect '%s' @ x= %.2f y= %.2f width= %.2f height= %.2f color=%s added.",
-		//	    					files.get(fileEventHandler.fileindex).filename,
-		//	    					newRect.getX(),
-		//	    					newRect.getY(),
-		//	    					newRect.getWidth(),
-		//	    					newRect.getHeight(),
-		//	    					parentDirectoryColor.toString()
-		//					));
+//		if (DEBUG_PRINT) System.out.println(String.format("rect '%s' @ x= %.2f y= %.2f width= %.2f height= %.2f color=%s added.",
+//				files.get(fileEventHandler.fileIndex).filename,
+//				newRect.getX(),
+//				newRect.getY(),
+//				newRect.getWidth(),
+//				newRect.getHeight(),
+//				parentDirectoryColor.toString()
+//		));
 
-		//					// csv style
-		//	    			System.out.println(String.format(Locale.US, "%s, %d, %.2f, %.2f, %.2f, %.2f, %s, %.2f, %.2f, %.2f",
-		//	    					files.get(fileEventHandler.fileindex).filename,
-		//	    					files.get(fileEventHandler.fileindex).level,
-		//	    					newRect.getX(),
-		//	    					newRect.getY(),
-		//	    					newRect.getWidth(),
-		//	    					newRect.getHeight(),
-		//	    					parentDirectoryColor.toString(),
-		//	    					files.get(fileEventHandler.fileindex).hue, 
-		//	    					1.0f, 
-		//	    					brightness
-		//					));
+//		// csv style
+//		if (DEBUG_PRINT) System.out.println(String.format(Locale.US, "%s, %d, %.2f, %.2f, %.2f, %.2f, %s, %.2f, %.2f, %.2f",
+//				files.get(fileEventHandler.fileIndex).filename,
+//				files.get(fileEventHandler.fileIndex).level,
+//				newRect.getX(),
+//				newRect.getY(),
+//				newRect.getWidth(),
+//				newRect.getHeight(),
+//				parentDirectoryColor.toString(),
+//				files.get(fileEventHandler.fileIndex).hue, 
+//				1.0f, 
+//				brightness
+//		));
 	}
 
 	private Rectangle addTestRectangleToTestRectCloud(double x, double y, double w, double h, Color color) {
