@@ -167,6 +167,10 @@ public class SpiralCollision extends Application {
 					) {
 				fileIndex++;
 			}
+			
+			if (fileIndex == 91) {
+				System.out.println();
+			}
 
 			if (fileIndex < numFiles) {
 
@@ -333,6 +337,7 @@ public class SpiralCollision extends Application {
 
 			currentSpiral = spirals[variant];
 			spiralPointIterator = currentSpiral.spiralpoints.listIterator();
+			spiralIndex = 0;
 
 			if (spiralFader != null)
 				spiralFader.stop();
@@ -395,16 +400,17 @@ public class SpiralCollision extends Application {
 			));
 
 			
-			// check collision ...
+			// fast collision check ...
 			boolean collision = false;
 			// .. but only if necessary ( no smaller rect tested before on this position) 
 			if (orientationIndex < numRectOrientationsAndAlignments) {
-				Dimension currentStoredMinimalTestDimensions = spiralEventHandler.currentSpiralPoint.testOrientations[orientationIndex];
+				Dimension currentStoredMinimalTestDimensions = spiralEventHandler.currentSpiralPoint.testOrientations[orientationIndex];				
 				collision  = currentTestRect.getWidth() > currentStoredMinimalTestDimensions.width 
-						|| currentTestRect.getHeight() > currentStoredMinimalTestDimensions.height;	
+						|| currentTestRect.getHeight() > currentStoredMinimalTestDimensions.height;
 			}
 			if (DEBUG_PRINT) System.out.print(collision ? "fast collision - ":"no fast collision - ");
 
+			// slow check collision ...
 			if ( ! collision ) {
 				// collision check is necessary because previously checked testRects were always bigger (bigger width and bigger height) 
 				collision = checkCollisonAABB(currentTestRect.getX(), currentTestRect.getY(),
