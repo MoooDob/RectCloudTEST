@@ -10,6 +10,7 @@ import java.util.Random;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.ListIterator;
 import java.util.Locale;
 
@@ -142,7 +143,7 @@ public class SpiralCollision extends Application {
 	// finally the array contains spiral points that had to be checked 
 	// the larger the spiral grows, the larger the array grows
 	// if points at the end are missing, the lastIndex, lastX and lastY fields contain the highest index, x and y values
-	private final SpiralInfo spirals[] = new SpiralInfo[numOfSpiralVariants];
+	private final HashMap<String, SpiralInfo> spirals = new HashMap<String, SpiralInfo>();
 
 	private class FileEventHandler implements EventHandler<ActionEvent> {
 
@@ -229,7 +230,7 @@ public class SpiralCollision extends Application {
 		private ListIterator<SpiralPoint> spiralPointIterator;
 		private SpiralPoint currentSpiralPoint;
 
-		private SpiralInfo currentSpiral;
+		private SpiralVariant currentSpiral;
 
 		@Override
 		public void handle(ActionEvent event) {
@@ -330,8 +331,14 @@ public class SpiralCollision extends Application {
 				variant = 0;
 			} 
 			if (DEBUG_PRINT) System.out.println("  spiral variant: " + variant);
-
-			currentSpiral = spirals[variant];
+			
+			String centerPoint = getCenterPoint(x0,y0);
+			if ( ! spirals.containsKey(centerPoint)) {
+				SpiralInfo spiralinfo = new SpiralInfo(numOfSpiralVariants);
+				spirals.put(centerPoint, spiralinfo);
+				appendDefaultSpiralVariants(spiralinfo);
+			}
+			currentSpiral = spirals.get(centerPoint).spiralvariants[variant];
 			spiralPointIterator = currentSpiral.spiralpoints.listIterator();
 			spiralIndex = 0;
 
@@ -700,8 +707,8 @@ public class SpiralCollision extends Application {
 
 					// if finally no fine tuning was possible
 					if (fineTuningStep == 0) {
-						if (spirals[spiralEventHandler.variant].spiralpoints.contains(spiralEventHandler.currentSpiralPoint)
-								&& spirals[spiralEventHandler.variant].spiralpoints.size() > 1) {
+						if (spiralEventHandler.currentSpiral.spiralpoints.contains(spiralEventHandler.currentSpiralPoint)
+								&& spiralEventHandler.currentSpiral.spiralpoints.size() > 1) {
 							// remove spiral point to mark this spiral location is already occupied
 							if (DEBUG_PRINT) System.out.println("    -> remove spiral point");
 							spiralEventHandler.currentSpiralPoint.pendingRemove = true;
@@ -926,6 +933,7 @@ public class SpiralCollision extends Application {
 			
 			if (DEBUG_PRINT) System.out.println("Center point: "+ (scene_width / 2) + "/" + (scene_height / 2));
 			
+			String centerPoint = getCenterPoint(scene_width / 2, scene_height / 2);
 			fileEventHandler.init(scene_width / 2,
 					scene_height / 2 /* center location of first item of the collision spiral */
 					);
@@ -984,20 +992,34 @@ public class SpiralCollision extends Application {
 
 			// Set start locations for the spirals in spiral point 0
 			SpiralPoint.init(numRectOrientationsAndAlignments);
+			
+			SpiralInfo spiralinfo = new SpiralInfo(numOfSpiralVariants);
+			appendDefaultSpiralVariants(spiralinfo);
 
-			spirals[0] = new SpiralInfo();
-			spirals[0].appendSpiralPoint(new SpiralPoint(0,  1,  1));
-			spirals[1] = new SpiralInfo();
-			spirals[1].appendSpiralPoint(new SpiralPoint(0,  1, -1));
-			spirals[2] = new SpiralInfo();
-			spirals[2].appendSpiralPoint(new SpiralPoint(0, -1,  1));
-			spirals[3] = new SpiralInfo();
-			spirals[3].appendSpiralPoint(new SpiralPoint(0, -1, -1));
+			spirals.put(centerPoint, spiralinfo);
+			
 
 			fileTimeline.play();
 
 		}
 
+	}
+
+	/**
+	 * @param spiralinfo
+	 */
+	private void appendDefaultSpiralVariants(SpiralInfo spiralinfo) {
+		spiralinfo.spiralvariants[0].appendSpiralPoint(new SpiralPoint(0,  1,  1));
+		spiralinfo.spiralvariants[1].appendSpiralPoint(new SpiralPoint(0,  1, -1));
+		spiralinfo.spiralvariants[2].appendSpiralPoint(new SpiralPoint(0, -1,  1));
+		spiralinfo.spiralvariants[3].appendSpiralPoint(new SpiralPoint(0, -1, -1));
+	}
+
+	/**
+	 * @return
+	 */
+	private static String getCenterPoint(double x0, double y0) {
+		return (x0 / 2) + "|" + (y0 / 2);
 	}
 
 	public double CanvasToCartesianX(double x0, double canvas_x) {
