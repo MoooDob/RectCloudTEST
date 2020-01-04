@@ -86,7 +86,7 @@ public class SpiralCollision extends Application {
 	public final static boolean DEBUG_PRINT = true;
 
 	// Files with this extension will be shown, null or empty array => all files 
-	final String[] fileExtensionFilter = {}; // {"java"}; // {"java", "cpp", "h"} // null /*=> all*/
+	final String[] fileExtensionFilter = {"java"}; // {"java", "cpp", "h"} // null /*=> all*/
 
 	// files with this extension will shown using their dimension (max line length x lines),
 	// other files will be shown using an equal sized rounded rectangle
@@ -143,6 +143,7 @@ public class SpiralCollision extends Application {
 	// the larger the spiral grows, the larger the array grows
 	// if points at the end are missing, the lastIndex, lastX and lastY fields contain the highest index, x and y values
 	private final SpiralInfo spirals[] = new SpiralInfo[numOfSpiralVariants];
+	private Canvas guidesCanvas;
 
 	private class FileEventHandler implements EventHandler<ActionEvent> {
 
@@ -211,6 +212,7 @@ public class SpiralCollision extends Application {
 			System.out.println("finished.");
 			spiralFader.playFromStart();
 			FineTuningFader.playFromStart();
+			guidesCanvas.setVisible(false);
 		}
 
 	}
@@ -866,7 +868,7 @@ public class SpiralCollision extends Application {
 			spiralCanvas.getGraphicsContext2D().setLineWidth(1);
 
 			// and for debugging too
-			Canvas guidesCanvas = new Canvas(scene_width, scene_height);
+			guidesCanvas = new Canvas(scene_width, scene_height);
 			GraphicsContext guidesGC = guidesCanvas.getGraphicsContext2D();
 			guidesGC.setStroke(Color.LIGHTGRAY);
 			guidesGC.setFill(Color.LIGHTGRAY);
