@@ -87,7 +87,7 @@ public class SpiralCollision extends Application {
 	public final static boolean DEBUG_PRINT = true;
 
 	// Files with this extension will be shown, null or empty array => all files 
-	final String[] fileExtensionFilter = {"java"}; // {"java", "cpp", "h"} // null /*=> all*/
+	final String[] fileExtensionFilter = {}; //{"java"}; // {"java", "cpp", "h"} // null /*=> all*/
 
 	// files with this extension will shown using their dimension (max line length x lines),
 	// other files will be shown using an equal sized rounded rectangle
@@ -108,6 +108,11 @@ public class SpiralCollision extends Application {
 	private final float HUE_MAX = .9f;
 
 	private final ArrayList<FileInfo> files = new ArrayList<FileInfo>();
+	private final HashMap<String, Double> fileSizeInfo = new HashMap<String, Double>();
+	private final ArrayList<Double> fileHeights = new ArrayList<Double>();
+	private final ArrayList<Double> fileWidths = new ArrayList<Double>();
+
+	
 	private final Label label = new Label();
 	private FadeTransition spiralFader;
 
@@ -846,10 +851,32 @@ public class SpiralCollision extends Application {
 			stage.setTitle("Spiral Rectangle Cloud of " + selectedDirectory.getName());
 
 			label.setText("Analysing directory structure...");
+			
+			fileSizeInfo.put("width.min", 0d);
+			fileSizeInfo.put("width.max", 0d);
+			fileSizeInfo.put("height.min", 0d);
+			fileSizeInfo.put("height.max", 0d);
+			fileSizeInfo.put("width.mean", 0d);
+			fileSizeInfo.put("height.mean", 0d);
 
 			// collect all files of the folder structure and sort them by absolute file path
 			totalNumOfLevels = visitDirectory(selectedDirectory, 0, HUE_MIN, HUE_MAX);
+			
+			if (files.size() == 0 ) {
+				label.setText("No files found based on filter.");
+				return;
+			}
+			fileSizeInfo.put("width.mean", fileSizeInfo.get("width.mean") / files.size());
+			fileSizeInfo.put("height.mean", fileSizeInfo.get("height.mean") / files.size());
 
+
+			double median = getMedian(fileWidths);
+			fileSizeInfo.put("width.median", median);
+			
+			median = getMedian(fileWidths);
+			fileSizeInfo.put("height.median", median);
+
+						
 			// Sort by filename
 			Collections.sort(files, new Comparator<FileInfo>() {
 				@Override
@@ -1007,6 +1034,22 @@ public class SpiralCollision extends Application {
 
 		}
 
+	}
+
+	/**
+	 * ArrayList is sorted afterwards 
+	 * @return 
+	 * 
+	 */
+	private double getMedian(ArrayList<Double> aList) {
+		Collections.sort(aList);
+		if (aList.size() % 2 == 0) {
+			// even: get arithmetic mean of the both items in the middle
+			int middle = aList.size() / 2;
+		    return ((double)aList.get(middle) + (double)aList.get(middle + 1)) / 2;
+		} else
+			// odd: get the item in the middle
+		    return (double) aList.get(aList.size() / 2);
 	}
 
 	/**
@@ -1305,6 +1348,15 @@ public class SpiralCollision extends Application {
 					if (width > 0 && height > 0) {
 						files.add(
 								new FileInfo(fileOrDirectory.getAbsolutePath(), level, width, height, hueOfDirectory));
+						fileSizeInfo.put("width.min", Math.min(fileSizeInfo.get("width.min"), width));
+						fileSizeInfo.put("width.max", Math.max(fileSizeInfo.get("width.max"), width));
+						fileSizeInfo.put("height.min", Math.min(fileSizeInfo.get("height.min"), height));
+						fileSizeInfo.put("height.max", Math.max(fileSizeInfo.get("height.max"), height));
+						fileSizeInfo.put("width.mean", fileSizeInfo.get("width.mean") + width);
+						fileSizeInfo.put("height.mean", fileSizeInfo.get("height.mean") + height);
+						fileWidths.add(width);
+						fileHeights.add(height);
+						
 					}
 				}
 			}
