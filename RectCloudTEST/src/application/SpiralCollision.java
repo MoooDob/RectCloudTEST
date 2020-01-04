@@ -143,12 +143,10 @@ public class SpiralCollision extends Application {
 	// finally the array contains spiral points that had to be checked 
 	// the larger the spiral grows, the larger the array grows
 	// if points at the end are missing, the lastIndex, lastX and lastY fields contain the highest index, x and y values
-<<<<<<< HEAD
-	private final SpiralInfo spirals[] = new SpiralInfo[numOfSpiralVariants];
-	private Canvas guidesCanvas;
-=======
 	private final HashMap<String, SpiralInfo> spirals = new HashMap<String, SpiralInfo>();
->>>>>>> branch 'master' of https://github.com/MoooDob/RectCloudTEST.git
+	
+	private Canvas guidesCanvas;
+
 
 	private class FileEventHandler implements EventHandler<ActionEvent> {
 
