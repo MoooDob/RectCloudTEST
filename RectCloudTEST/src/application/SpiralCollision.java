@@ -167,10 +167,6 @@ public class SpiralCollision extends Application {
 					) {
 				fileIndex++;
 			}
-			
-			if (fileIndex == 91) {
-				System.out.println();
-			}
 
 			if (fileIndex < numFiles) {
 
