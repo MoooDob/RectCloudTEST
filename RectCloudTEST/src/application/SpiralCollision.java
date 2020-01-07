@@ -1,8 +1,10 @@
 package application;
 
 import java.io.File;
+
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -25,6 +27,7 @@ import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.BoundingBox;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -47,6 +50,21 @@ import javafx.scene.paint.Paint;
 import javafx.scene.shape.Rectangle;
 import javafx.animation.Animation.Status;
 
+
+
+enum Sorting {
+   BY_PATH, 
+   BY_PARENTFOLDER, 
+   BY_LEVEL_ASC, BY_LEVEL_DESC, 
+   BY_AREA_ASC, BY_AREA_DESC, 
+   BY_WIDTH_ASC, BY_WIDTH_DESC, 
+   BY_HEIGHT_ASC, BY_HEIGHT_DESC; 
+}
+
+
+
+
+
 public class SpiralCollision extends Application {
 
 	final boolean showFiles = true;
@@ -55,6 +73,8 @@ public class SpiralCollision extends Application {
 	final int numOfRectangles = 10;
 	final double maxRectHeight = scene_width / 8;
 	final double maxRectWidth = scene_height / 9;
+	
+	final Sorting sorting = Sorting.BY_LEVEL_ASC;
 
 	final double defaultWidth = 12;
 	final double defaultHeight = 12;
@@ -82,6 +102,22 @@ public class SpiralCollision extends Application {
 
 	// man number of steps for fine tuning
 	public int maxFineTuningSteps = 100;
+
+	// false = leave the center of all spirals at the origin
+	// true = move the center of the current spiral to the center of the first placed rectangle 
+	public boolean moveSpiralOrigin = true;
+	
+	// if moveSpiralCenter == true
+	// false = leave the center of the current spiral at center of the first placed rectangle
+	// true = move the center of the current spiral to the center of mass (mean of locations) of all rectangles in this folder
+	public boolean moveSpiralCenterToCenterOfMass = true;
+	
+	
+	// true = always start search at origin
+	// false = start search at origin of the (pre)parent folder 
+	public boolean alwaysStartSearchAtOrigin = false;
+
+
 	
 	public final static boolean DEBUG_DRAW = true;
 	public final static boolean DEBUG_PRINT = true;
@@ -89,8 +125,8 @@ public class SpiralCollision extends Application {
 	// Files with this extension will be shown, null or empty array => all files 
 	final String[] fileExtensionFilter = {}; //{"java"}; // {"java", "cpp", "h"} // null /*=> all*/
 
-	// files with this extension will shown using their dimension (max line length x lines),
-	// other files will be shown using an equal sized rounded rectangle
+	// files with this extension will shown using their dimension (max line length x #lines),
+	// files with other extensions will be shown using an equal sized rectangle
 	// null or empty array => show all files with dimensions
 	final String[] dimensionDisplayExtensionFilter = {}; // {"java"}
 
@@ -116,7 +152,7 @@ public class SpiralCollision extends Application {
 	private final Label label = new Label();
 	private FadeTransition spiralFader;
 
-	private File selectedDirectory;
+	private File rootDirectory;
 	private final int numRectOrientationsAndAlignments = 4;
 	private Rectangle[] testRects = new Rectangle[numRectOrientationsAndAlignments + 1];
 
@@ -128,7 +164,7 @@ public class SpiralCollision extends Application {
 	private Timeline finePositioningTimeline = new Timeline();
 
 	private final FileEventHandler fileEventHandler = new FileEventHandler();
-	private final SpiralEventHandler spiralEventHandler = new SpiralEventHandler();
+	private final SpiralEventHandler spiralPositionEventHandler = new SpiralEventHandler();
 	private final OrientationEventHandler orientationEventHandler = new OrientationEventHandler();
 	private final FinePositioningEventHandler fineTuningEventHandler = new FinePositioningEventHandler();
 
@@ -138,8 +174,14 @@ public class SpiralCollision extends Application {
 	private float totalNumOfLevels = -1;
 	private Canvas FineTuningCanvas;
 	private FadeTransition FineTuningFader;
+	
+	// origin of the drawing area
+	private Point2D origin =  new Point2D(scene_width / 2, scene_height / 2);
 
-	public int numOfSpiralVariants = 4;
+	public final int numOfSpiralVariants = 4;
+	public final double variantOffset = 1; 
+
+	
 	// array of all spiral points of all spiral start variants
 	// each SpiralPoint contains informations about the checked test rectangle orientations 
 	// and their minimal tested dimensions. 
@@ -151,6 +193,8 @@ public class SpiralCollision extends Application {
 	private final HashMap<String, SpiralInfo> spirals = new HashMap<String, SpiralInfo>();
 	
 	private Canvas guidesCanvas;
+	
+	private final HashMap<String, Point2D> folderOrigins = new HashMap<String, Point2D>();
 
 
 	private class FileEventHandler implements EventHandler<ActionEvent> {
@@ -160,10 +204,16 @@ public class SpiralCollision extends Application {
 		private double fileWidth = 0;
 		private double fileHeight = 0;
 		private int fileIndex = 0;
-		private double x0;
-		private double y0;
+		//private double x0;
+		//private double y0;
 		private int level;
 		private float hue;
+		private String parentFolder;
+		
+		// set spiral origin of this file to origin
+		private Point2D spiralOriginOfThisFile = null;
+
+		private boolean isFirstFileInParentFolder = false;
 
 		public void handle(ActionEvent event) {
 			
@@ -191,8 +241,62 @@ public class SpiralCollision extends Application {
 
 				if (DEBUG_PRINT) System.out.println("fileindex: " + fileIndex + " out of 0.." + (numFiles - 1) + " (" + filename + ", "
 						+ fileWidth + " x " + fileHeight + ")");
-				spiralEventHandler.init(x0, y0);
-				fileTimeline.pause();
+				
+				// determine path of file
+				try {
+					parentFolder = new File(new File(filename).getCanonicalPath()).getParent();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				// Move spiral origin
+				
+					// set spiral origin of this file to origin
+					spiralOriginOfThisFile = new Point2D(origin.getX(), origin.getY());
+					
+					// Move it to the first occurrence / the center of mass of the current folder?
+					// (or leave the center of all spirals at the origin?) 
+					if (moveSpiralOrigin) {
+										
+						// search for center of a spiral for this path
+						if (folderOrigins.containsKey(parentFolder)) {
+							// origin of the spiral for this file is the spiral orgin of the parent folders
+							spiralOriginOfThisFile = folderOrigins.get(parentFolder); 
+						} else {
+							// its the first file in this folder
+							isFirstFileInParentFolder = true;
+							if (alwaysStartSearchAtOrigin) {
+								// start search at the origin 
+								spiralOriginOfThisFile = origin; 
+							}
+							else {
+								// start location search at the origin of the (pre)parent folder 
+								String preParentFolder = parentFolder; 
+								boolean foundPreparentFolder;
+								// Loop until you find a parent folder
+								while ( ! (foundPreparentFolder = folderOrigins.containsKey(preParentFolder)) ) {
+									preParentFolder = new File(preParentFolder).getParent();
+								}
+								
+								if (foundPreparentFolder) {
+									spiralOriginOfThisFile = folderOrigins.get(preParentFolder); 
+								}
+								else {
+									// this should never happen!
+								}
+							}							
+							
+							// no spiral center stored till now, so store it
+							folderOrigins.put(parentFolder, spiralOriginOfThisFile);
+
+						}																
+						
+					}
+				
+				System.out.println("  spiral origin: " + spiralOriginOfThisFile);
+
+				spiralPositionEventHandler.init(spiralOriginOfThisFile);
 				spiralPositionTimeline.play();
 				
 			};
@@ -204,9 +308,8 @@ public class SpiralCollision extends Application {
 
 		}
 
-		public void init(double x0, double y0) {
-			this.x0 = x0;
-			this.y0 = y0;
+		public void init() {
+			
 			this.fileIndex = 0;
 			this.numFiles = files.size();
 
@@ -214,6 +317,7 @@ public class SpiralCollision extends Application {
 
 		private void OnFinished() {
 			System.out.println("finished.");
+			label.setText("finished.");
 			spiralFader.playFromStart();
 			FineTuningFader.playFromStart();
 			guidesCanvas.setVisible(false);
@@ -228,9 +332,6 @@ public class SpiralCollision extends Application {
 		private double x = 0;
 		private double y = 0;
 
-		private double x0;
-		private double y0;
-
 		private double prev_x = 0;
 		private double prev_y = 0;
 
@@ -240,6 +341,8 @@ public class SpiralCollision extends Application {
 		private SpiralPoint currentSpiralPoint;
 
 		private SpiralVariant currentSpiral;
+
+		private Point2D spiralOrigin;
 
 		@Override
 		public void handle(ActionEvent event) {
@@ -285,7 +388,7 @@ public class SpiralCollision extends Application {
 				x = currentSpiral.latestX;
 				y = currentSpiral.latestY;
 				
-				// calculate next point in the spiral of Theodorus (Wurzelspirale)
+				// calculate next point in the spiral of Theodorus (german: Wurzelspirale)
 				
 					// store the old x and y
 					prev_x = x;
@@ -309,10 +412,10 @@ public class SpiralCollision extends Application {
 
 			// Draw spiral, center point
 			if (DEBUG_DRAW) {
-				spiralCanvas.getGraphicsContext2D().strokeLine(CartesianToCanvasX(x0, x), CartesianToCanvasY(y0, y),
-					CartesianToCanvasX(x0, prev_x), CartesianToCanvasY(y0, prev_y));
-				spiralCanvas.getGraphicsContext2D().fillOval(CartesianToCanvasX(x0, x) - 5 / 2,
-					CartesianToCanvasY(y0, y) - 5 / 2, 5, 5);
+				spiralCanvas.getGraphicsContext2D().strokeLine(CartesianToCanvasX(spiralOrigin.getX(), x), CartesianToCanvasY(spiralOrigin.getY(), y),
+					CartesianToCanvasX(spiralOrigin.getX(), prev_x), CartesianToCanvasY(spiralOrigin.getY(), prev_y));
+				spiralCanvas.getGraphicsContext2D().fillOval(CartesianToCanvasX(spiralOrigin.getX(), x) - 5 / 2,
+					CartesianToCanvasY(spiralOrigin.getY(), y) - 5 / 2, 5, 5);
 			}
 
 			if (maxSpiralPositions > 0 && spiralIndex >= maxSpiralPositions) {
@@ -321,16 +424,16 @@ public class SpiralCollision extends Application {
 				OnFinished();
 			} else {
 				if (DEBUG_PRINT) System.out.println("  ->test spiral point " + spiralIndex + " (variant: " + variant + ") x=" + x + " y=" + y);
-				orientationEventHandler.init(x0, y0, x, y);
+				orientationEventHandler.init(x, y);
 				orientationAndAlignmentTimeline.play();
 			}
 
 		}
 		
 
-		public void init(double x0, double y0) {
-			this.x0 = x0;
-			this.y0 = y0;
+		public void init(Point2D spiralOrigin) {
+			
+			this.spiralOrigin = spiralOrigin;
 
 			prev_x = 0;
 			prev_y = 0;
@@ -341,13 +444,13 @@ public class SpiralCollision extends Application {
 			} 
 			if (DEBUG_PRINT) System.out.println("  spiral variant: " + variant);
 			
-			String centerPoint = getCenterPoint(x0,y0);
-			if ( ! spirals.containsKey(centerPoint)) {
+			String spiralOriginKey = getSpiralOriginKey(spiralOrigin);
+			if ( ! spirals.containsKey(spiralOriginKey)) {
 				SpiralInfo spiralinfo = new SpiralInfo(numOfSpiralVariants);
-				spirals.put(centerPoint, spiralinfo);
+				spirals.put(spiralOriginKey, spiralinfo);
 				appendDefaultSpiralVariants(spiralinfo);
 			}
-			currentSpiral = spirals.get(centerPoint).spiralvariants[variant];
+			currentSpiral = spirals.get(spiralOriginKey).spiralvariants[variant];
 			spiralPointIterator = currentSpiral.spiralpoints.listIterator();
 			spiralIndex = 0;
 
@@ -358,9 +461,10 @@ public class SpiralCollision extends Application {
 
 			spiralCanvas.setOpacity(1);
 			spiralCanvas.getGraphicsContext2D().clearRect(0, 0, spiralCanvas.getWidth(), spiralCanvas.getHeight());
+			spiralCanvas.setVisible(true);
 
 			// mark center of spiral
-			spiralCanvas.getGraphicsContext2D().fillOval(x0 - 5 / 2, y0 - 5 / 2, 5, 5);
+			spiralCanvas.getGraphicsContext2D().fillOval(spiralOrigin.getX() - 5 / 2, spiralOrigin.getY() - 5 / 2, 5, 5);
 
 		}
 
@@ -380,17 +484,17 @@ public class SpiralCollision extends Application {
 		private int orientationIndex;
 		private double rectHeight;
 		private double rectWidth;
-
-		private double y0;
-		private double x0;
-		
+	
 		// shortcut 
 		private Dimension currentSpiralPointOrientation;
+		private Point2D spiralOrigin;
 
 		@Override
 		public void handle(ActionEvent event) {
 			
 			orientationAndAlignmentTimeline.pause();
+			
+			boolean locationOccupiedTest = orientationIndex >= numRectOrientationsAndAlignments;
 			
 			if (DEBUG_PRINT) System.out.println(
 					"    Orientation " + orientationIndex + " out of 0.." + (numRectOrientationsAndAlignments + 1 - 1));
@@ -414,9 +518,9 @@ public class SpiralCollision extends Application {
 			
 			// fast collision check ...
 			boolean collision = false;
-			// .. but only if necessary ( no smaller rect tested before on this position) 
-			if (orientationIndex < numRectOrientationsAndAlignments) {
-				Dimension currentStoredMinimalTestDimensions = spiralEventHandler.currentSpiralPoint.testOrientations[orientationIndex];				
+			// .. but only if necessary ( no smaller rectangle tested before on this position and do NOT test with minimal test rectangle ) 
+			if ( ! locationOccupiedTest ) {
+				Dimension currentStoredMinimalTestDimensions = spiralPositionEventHandler.currentSpiralPoint.testOrientations[orientationIndex];				
 				collision  = currentTestRect.getWidth() > currentStoredMinimalTestDimensions.width 
 						|| currentTestRect.getHeight() > currentStoredMinimalTestDimensions.height;
 			}
@@ -430,23 +534,23 @@ public class SpiralCollision extends Application {
 			}
 			if (DEBUG_PRINT) System.out.println(collision ? "collision":"no collision");
 			
-			if ( ! collision ) {
+			if ( ! collision && ! locationOccupiedTest ) {
 				// collision free position found
 
 				// stop orientation
 				orientationAndAlignmentTimeline.stop();
 
 				// reset finePos
-				fineTuningEventHandler.init(x0, y0, currentTestRect);
+				fineTuningEventHandler.init(currentTestRect);
 				finePositioningTimeline.play();
 
 			} else {
 				// replace width and height of test orientation of spiral points, if necessary
 
 				// Orientation 0..3: 4 variants of orientations
-				if (orientationIndex < numRectOrientationsAndAlignments) {
+				if ( ! locationOccupiedTest ) {
 					
-					currentSpiralPointOrientation = spiralEventHandler.currentSpiralPoint.testOrientations[orientationIndex];
+					currentSpiralPointOrientation = spiralPositionEventHandler.currentSpiralPoint.testOrientations[orientationIndex];
 
 					// current file dimension smaller than the smallest previously checked? 
 					if (currentTestRect.getWidth() < currentSpiralPointOrientation.width 
@@ -459,12 +563,11 @@ public class SpiralCollision extends Application {
 					// orientationIndex == 4 => minimal test square collision
 					// remove spiralInfo for this spiral coordinate to mark this point as not to be checked any more in future
 					if (DEBUG_PRINT) System.out.println("    -> remove spiral point");
-					spiralEventHandler.currentSpiralPoint.pendingRemove = true;
+					spiralPositionEventHandler.currentSpiralPoint.pendingRemove = true;
 				}
 			}	
 				
 			orientationIndex++;
-			
 			if (orientationIndex >= (numRectOrientationsAndAlignments + 1)) {
 				OnFinished();
 				return;
@@ -478,11 +581,11 @@ public class SpiralCollision extends Application {
 		 * @return
 		 */
 
-		public void init(double x0, double y0, double x, double y) {
-
-			this.x0 = x0;
-			this.y0 = y0;
-
+		public void init(double x, double y) {
+			
+			// shortcut
+			this.spiralOrigin = spiralPositionEventHandler.spiralOrigin;
+			
 			orientationIndex = 0;
 
 			this.rectWidth = fileEventHandler.fileWidth;
@@ -492,37 +595,37 @@ public class SpiralCollision extends Application {
 			
 			// portrait rectangle, center point
 			testRects[0] = new Rectangle( 
-					CartesianToCanvasX(x0, x) - rectWidth / 2, 
-					CartesianToCanvasY(y0, y) - rectHeight / 2, 
+					CartesianToCanvasX(spiralOrigin.getX(), x) - rectWidth / 2, 
+					CartesianToCanvasY(spiralOrigin.getY(), y) - rectHeight / 2, 
 					rectWidth, 
 					rectHeight
 			); 
 			
 			// landscape rectangle, center point
 			testRects[1] = new Rectangle(
-					CartesianToCanvasX(x0, x) - rectHeight / 2, 
-					CartesianToCanvasY(y0, y) - rectWidth / 2, 
+					CartesianToCanvasX(spiralOrigin.getX(), x) - rectHeight / 2, 
+					CartesianToCanvasY(spiralOrigin.getY(), y) - rectWidth / 2, 
 					rectHeight, 
 					rectWidth
 			); 
 
 			testRects[2] = new Rectangle(
-					CartesianToCanvasX(x0, x) - (x < 0 ? rectWidth : 0), 
-					CartesianToCanvasY(y0, y) - (y > 0 ? rectHeight : 0), 
+					CartesianToCanvasX(spiralOrigin.getX(), x) - (x < 0 ? rectWidth : 0), 
+					CartesianToCanvasY(spiralOrigin.getY(), y) - (y > 0 ? rectHeight : 0), 
 					rectWidth,
 					rectHeight
 			);
 			testRects[3] = new Rectangle(
-					CartesianToCanvasX(x0, x) - (x < 0 ? rectHeight : 0), 
-					CartesianToCanvasY(y0, y) - (y > 0 ? rectWidth : 0),
+					CartesianToCanvasX(spiralOrigin.getX(), x) - (x < 0 ? rectHeight : 0), 
+					CartesianToCanvasY(spiralOrigin.getY(), y) - (y > 0 ? rectWidth : 0),
 					rectHeight, 
 					rectWidth
 			);
 
 			// minimal test square with center pivot for testing the general collision on this point
 			testRects[4] = new Rectangle(
-					CartesianToCanvasX(x0, x) - 0.5, 
-					CartesianToCanvasY(y0, y) - 0.5, 
+					CartesianToCanvasX(spiralOrigin.getX(), x) - 0.5, 
+					CartesianToCanvasY(spiralOrigin.getY(), y) - 0.5, 
 					1, 
 					1
 			);
@@ -548,8 +651,6 @@ public class SpiralCollision extends Application {
 
 		private double prev_x = 0;
 		private double prev_y = 0;
-		private double x0 = 0;
-		private double y0 = 0;
 		private double ny;
 		private double nx;
 		private double x;
@@ -570,6 +671,7 @@ public class SpiralCollision extends Application {
 		private boolean[] direction = new boolean[2];
 		// number of movement direction combinations
 		private int fineTuningDirectionStep;
+		private Point2D spiralOrigin;
 
 		@Override
 		public void handle(ActionEvent event) {
@@ -603,8 +705,8 @@ public class SpiralCollision extends Application {
 				if (DEBUG_PRINT) System.out.println(String.format("       %s x= %.2f %s y= %.2f ", direction[DIRECTION_X] ? "new":"old",x, direction[DIRECTION_Y] ? "new":"old",y));
 
 				// create new test rectangle
-				canvas_x = CartesianToCanvasX(x0, x);
-				canvas_y = CartesianToCanvasY(y0, y);
+				canvas_x = CartesianToCanvasX(spiralOrigin.getX(), x);
+				canvas_y = CartesianToCanvasY(spiralOrigin.getY(), y);
 				if (DEBUG_DRAW) currentTestRect = addTestRectangleToTestRectCloud(canvas_x, canvas_y, width, height, null);
 
 				if (direction[DIRECTION_X])
@@ -614,8 +716,8 @@ public class SpiralCollision extends Application {
 
 				if (DEBUG_DRAW) {
 					// debug draw location on FineTuningCanvas
-					double prev_canvas_x = CartesianToCanvasX(x0, x);
-					double prev_canvas_y = CartesianToCanvasY(y0, y);
+					double prev_canvas_x = CartesianToCanvasX(spiralOrigin.getX(), x);
+					double prev_canvas_y = CartesianToCanvasY(spiralOrigin.getY(), y);
 					FineTuningCanvas.getGraphicsContext2D().strokeLine(prev_canvas_x, prev_canvas_y, canvas_x, canvas_y);
 					FineTuningCanvas.getGraphicsContext2D().fillOval(canvas_x - 5 / 2, canvas_y - 5 / 2, 5, 5);
 				}
@@ -711,16 +813,39 @@ public class SpiralCollision extends Application {
 
 				if (fineTuningDirectionStep >= 3) {
 
-					addNewRectangleToRectCloud(CartesianToCanvasX(x0, prev_x), CartesianToCanvasY(y0, prev_y),
+					// create new rectangle
+					addNewRectangleToRectCloud(CartesianToCanvasX(spiralOrigin.getX(), prev_x), CartesianToCanvasY(spiralOrigin.getY(), prev_y),
 							width, height);
+					
+					// update spiral origin if needed
+					if (moveSpiralOrigin) {
+						if (fileEventHandler.isFirstFileInParentFolder) {
+							// set the origin of the parent folder to the center location of the rectangle
+							fileEventHandler.spiralOriginOfThisFile = new Point2D(
+									CartesianToCanvasX(spiralOrigin.getX(), prev_x) + width / 2,
+									CartesianToCanvasY(spiralOrigin.getY(), prev_y) - height / 2
+							);				
+						}
+						
+						// move it to the center of mass of the current folder?
+						// (or leave the spiral center to the point of the first occurrence?) 
+						if (moveSpiralCenterToCenterOfMass) {
+							// set the origin of the parent folder to the mean of the locations 
+							// of the previous origin and the center of the new rectangle  
+							fileEventHandler.spiralOriginOfThisFile = new Point2D(
+									(fileEventHandler.spiralOriginOfThisFile.getX() + (CartesianToCanvasX(spiralOrigin.getX(), prev_x) + width / 2)) / 2, // mean X
+									(fileEventHandler.spiralOriginOfThisFile.getY() + (CartesianToCanvasY(spiralOrigin.getY(), prev_y) - height / 2)) / 2 // mean Y
+							);				
+						}
+					}
 
 					// if finally no fine tuning was possible
 					if (fineTuningStep == 0) {
-						if (spiralEventHandler.currentSpiral.spiralpoints.contains(spiralEventHandler.currentSpiralPoint)
-								&& spiralEventHandler.currentSpiral.spiralpoints.size() > 1) {
+						if (spiralPositionEventHandler.currentSpiral.spiralpoints.contains(spiralPositionEventHandler.currentSpiralPoint)
+								&& spiralPositionEventHandler.currentSpiral.spiralpoints.size() > 1) {
 							// remove spiral point to mark this spiral location is already occupied
 							if (DEBUG_PRINT) System.out.println("    -> remove spiral point");
-							spiralEventHandler.currentSpiralPoint.pendingRemove = true;
+							spiralPositionEventHandler.currentSpiralPoint.pendingRemove = true;
 						}
 					}					
 				}
@@ -738,15 +863,17 @@ public class SpiralCollision extends Application {
 		}
 
 		
-		public void init(double x0, double y0, Rectangle rect) {
-			init(x0, y0, rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+		public void init(Rectangle rect) {
+			init(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
 		}
-
 		
-		public void init(double x0, double y0, double canvas_x, double canvas_y, double w, double h) {
+//		public void init(BoundingBox box) {
+//			init(box.get .getX(), box.getY(), box.getWidth(), box.getHeight());
+//		}
+		
+		public void init(double canvas_x, double canvas_y, double w, double h) {
 
-			this.x0 = x0;
-			this.y0 = y0;
+			this.spiralOrigin = spiralPositionEventHandler.spiralOrigin;
 			this.width = w;
 			this.height = h;
 
@@ -758,8 +885,8 @@ public class SpiralCollision extends Application {
 			fineTuningDirectionStep = 0;
 
 			// convert canvas coordinates to Cartesian coordinates, x0 and y0 is the center point
-			x = CanvasToCartesianX(x0, canvas_x);
-			y = CanvasToCartesianY(y0, canvas_y);
+			x = CanvasToCartesianX(spiralOrigin.getX(), canvas_x);
+			y = CanvasToCartesianY(spiralOrigin.getY(), canvas_y);
 			if (DEBUG_PRINT) System.out.println(String.format("     canvas_x= %.2f canvas_y= %.2f", canvas_x, canvas_y));
 			if (DEBUG_PRINT) System.out.println(String.format("     x= %.2f y= %.2f", x, y));
 
@@ -783,6 +910,10 @@ public class SpiralCollision extends Application {
 			// clear canvas
 			FineTuningCanvas.getGraphicsContext2D().clearRect(0, 0, FineTuningCanvas.getWidth(),
 					FineTuningCanvas.getHeight());
+			
+			// show Canvas
+			FineTuningCanvas.setOpacity(1);
+			FineTuningCanvas.setVisible(true);
 
 		}
 
@@ -840,15 +971,15 @@ public class SpiralCollision extends Application {
 
 		// ask for directory
 		DirectoryChooser dc = new DirectoryChooser();
-		selectedDirectory = dc.showDialog(stage);
+		rootDirectory = dc.showDialog(stage);
 
-		if (selectedDirectory == null) {
+		if (rootDirectory == null) {
 			label.setText("No directory selected. Terminated.");
 			if (DEBUG_PRINT) System.out.println(label.getText());
 		} else {
 
 			// Adding Title to the stage
-			stage.setTitle("Spiral Rectangle Cloud of " + selectedDirectory.getName());
+			stage.setTitle("Spiral Rectangle Cloud of " + rootDirectory.getName() + " (" + sorting.name() + ")");
 
 			label.setText("Analysing directory structure...");
 			
@@ -858,9 +989,16 @@ public class SpiralCollision extends Application {
 			fileSizeInfo.put("height.max", 0d);
 			fileSizeInfo.put("width.mean", 0d);
 			fileSizeInfo.put("height.mean", 0d);
+						
+			try {
+				folderOrigins.put(rootDirectory.getCanonicalPath(), origin);
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 
 			// collect all files of the folder structure and sort them by absolute file path
-			totalNumOfLevels = visitDirectory(selectedDirectory, 0, HUE_MIN, HUE_MAX);
+			totalNumOfLevels = visitDirectory(rootDirectory, 0, HUE_MIN, HUE_MAX);
 			
 			if (files.size() == 0 ) {
 				label.setText("No files found based on filter.");
@@ -870,20 +1008,114 @@ public class SpiralCollision extends Application {
 			fileSizeInfo.put("height.mean", fileSizeInfo.get("height.mean") / files.size());
 
 
-			double median = getMedian(fileWidths);
+			double median = getMedianOf(fileWidths);
 			fileSizeInfo.put("width.median", median);
 			
-			median = getMedian(fileWidths);
+			median = getMedianOf(fileWidths);
 			fileSizeInfo.put("height.median", median);
 
-						
-			// Sort by filename
-			Collections.sort(files, new Comparator<FileInfo>() {
-				@Override
-				public int compare(FileInfo a, FileInfo b) {
-					return a.filename.compareToIgnoreCase(b.filename);
-				}
-			});
+			switch (sorting) {		
+			case BY_PARENTFOLDER:
+				// Sort by parent folder
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return new File(a.filename).getParent().compareToIgnoreCase(new File(b.filename).getParent());
+					}
+				});
+				break;
+				
+			case BY_LEVEL_ASC: 
+				// Sort by 
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return a.level - b.level;
+					}
+				});
+				break;
+				
+			case BY_LEVEL_DESC: 
+				// Sort by 
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return b.level - a.level;
+					}
+				});
+				break;
+				
+			case BY_AREA_ASC : 
+				// Sort by 
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return (int) ((a.width * a.height) - (b.width * b.height));
+					}					
+				});
+				break;
+				
+			case BY_AREA_DESC : 
+				// Sort by 
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return (int) ((b.width * b.height) - (a.width * a.height));
+					}					
+				});
+				break;
+				
+			case BY_WIDTH_ASC: 
+				// Sort by 
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return (int) (a.width - b.width);
+					}
+				});
+				break;
+				
+			case BY_WIDTH_DESC: 
+				// Sort by 
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return (int) (b.width - a.width);
+					}
+				});
+				break;
+				
+			case BY_HEIGHT_ASC:			
+				// Sort by 
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return (int) (a.height - b.height);
+					}
+				});
+				break;
+			
+			case BY_HEIGHT_DESC:			
+				// Sort by 
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return (int) (b.height - a.height);
+					}
+				});
+				break;
+
+			default: // == BY_PATH
+				// Sort by path
+				Collections.sort(files, new Comparator<FileInfo>() {
+					@Override
+					public int compare(FileInfo a, FileInfo b) {
+						return a.filename.compareToIgnoreCase(b.filename);
+					}
+				});
+				break;
+			
+			} // switch
 
 			// adding clouds (panes)
 			pane.getChildren().add(rectCloud);
@@ -964,12 +1196,10 @@ public class SpiralCollision extends Application {
 			
 			if (DEBUG_PRINT) System.out.println("Center point: "+ (scene_width / 2) + "/" + (scene_height / 2));
 			
-			String centerPoint = getCenterPoint(scene_width / 2, scene_height / 2);
-			fileEventHandler.init(scene_width / 2,
-					scene_height / 2 /* center location of first item of the collision spiral */
-					);
+			String centerPoint = getSpiralOriginKey(new Point2D(scene_width / 2, scene_height / 2));
+			fileEventHandler.init();
 			KeyFrame fileKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), fileEventHandler);
-			KeyFrame spiralPositionKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), spiralEventHandler);
+			KeyFrame spiralPositionKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), spiralPositionEventHandler);
 			KeyFrame orientationKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), orientationEventHandler);
 			KeyFrame finePositionKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), fineTuningEventHandler);
 
@@ -998,6 +1228,14 @@ public class SpiralCollision extends Application {
 			spiralFader.setFromValue(1.0);
 			spiralFader.setToValue(0.0);
 			spiralFader.setCycleCount(1);
+			spiralFader.setOnFinished(new EventHandler<ActionEvent>() {
+				@Override
+				public void handle(ActionEvent event) {
+					// hide spiralCanvas
+					spiralCanvas.setVisible(false);
+				}
+			});			
+
 			
 			// Prepare FineTuningCanvas Fading					
 			FineTuningFader = new FadeTransition(Duration.millis(rectFadingSpeed), FineTuningCanvas);
@@ -1008,17 +1246,11 @@ public class SpiralCollision extends Application {
 			FineTuningFader.setOnFinished(new EventHandler<ActionEvent>() {
 				@Override
 				public void handle(ActionEvent event) {
-					// remove faded rectangle from testRectCloud
+					// remove faded rectangles from testRectCloud
 					testRectCloud.getChildren().remove(((FadeTransition) event.getSource()).getNode());
+					FineTuningCanvas.setVisible(false);
 				}
-			});
-
-			// Prepare fading of FineTuningCanvas
-			FineTuningFader = new FadeTransition(Duration.millis(3000), FineTuningCanvas);
-			FineTuningFader.setFromValue(1.0);
-			FineTuningFader.setToValue(0.0);
-			FineTuningFader.setCycleCount(1);
-			
+			});			
 			
 
 			// Set start locations for the spirals in spiral point 0
@@ -1041,7 +1273,7 @@ public class SpiralCollision extends Application {
 	 * @return 
 	 * 
 	 */
-	private double getMedian(ArrayList<Double> aList) {
+	private double getMedianOf(ArrayList<Double> aList) {
 		Collections.sort(aList);
 		if (aList.size() % 2 == 0) {
 			// even: get arithmetic mean of the both items in the middle
@@ -1056,17 +1288,17 @@ public class SpiralCollision extends Application {
 	 * @param spiralinfo
 	 */
 	private void appendDefaultSpiralVariants(SpiralInfo spiralinfo) {
-		spiralinfo.spiralvariants[0].appendSpiralPoint(new SpiralPoint(0,  1,  1));
-		spiralinfo.spiralvariants[1].appendSpiralPoint(new SpiralPoint(0,  1, -1));
-		spiralinfo.spiralvariants[2].appendSpiralPoint(new SpiralPoint(0, -1,  1));
-		spiralinfo.spiralvariants[3].appendSpiralPoint(new SpiralPoint(0, -1, -1));
+		spiralinfo.spiralvariants[0].appendSpiralPoint(new SpiralPoint(0,  1 * variantOffset,  1 * variantOffset));
+		spiralinfo.spiralvariants[1].appendSpiralPoint(new SpiralPoint(0,  1 * variantOffset, -1 * variantOffset));
+		spiralinfo.spiralvariants[2].appendSpiralPoint(new SpiralPoint(0, -1 * variantOffset,  1 * variantOffset));
+		spiralinfo.spiralvariants[3].appendSpiralPoint(new SpiralPoint(0, -1 * variantOffset, -1 * variantOffset));
 	}
 
 	/**
 	 * @return
 	 */
-	private static String getCenterPoint(double x0, double y0) {
-		return (x0 / 2) + "|" + (y0 / 2);
+	private static String getSpiralOriginKey(Point2D point) {
+		return point.getX() + "|" + point.getY();
 	}
 
 	public double CanvasToCartesianX(double x0, double canvas_x) {
@@ -1392,9 +1624,10 @@ public class SpiralCollision extends Application {
 	 * was spread over the wideness of the directory tree.
 	 * 
 	 * @param rectTemplate
+	 * @return 
 	 * 
 	 */
-	private void addNewRectangleToRectCloud(double canvas_x, double canvas_y, double w, double h) {
+	private Rectangle addNewRectangleToRectCloud(double canvas_x, double canvas_y, double w, double h) {
 
 		// create rectangle and add to RectCloud
 		Rectangle newRect = new Rectangle(canvas_x, canvas_y, w, h);
@@ -1404,7 +1637,17 @@ public class SpiralCollision extends Application {
 				java.awt.Color.getHSBColor(fileEventHandler.hue, 1.0f, brightness));
 		newRect.setStroke(Color.TRANSPARENT);
 		newRect.setFill(parentDirectoryColor);
-		Tooltip.install(newRect, new Tooltip(fileEventHandler.filename));
+		Tooltip.install(newRect, 
+				new Tooltip(
+						fileEventHandler.filename 
+						+ "\nw=" + fileEventHandler.fileWidth 
+						+ " h=" + fileEventHandler.fileHeight
+						+ " a=" + (fileEventHandler.fileWidth * fileEventHandler.fileHeight) 
+						+ " l=" + fileEventHandler.level
+//						+ "\nrw=" + newRect.getWidth()
+//						+ " rh=" + newRect.getHeight()
+				)
+		);
 		rectCloud.getChildren().add(newRect);
 //		if (DEBUG_PRINT) System.out.println(String.format("rect '%s' @ x= %.2f y= %.2f width= %.2f height= %.2f color=%s added.",
 //				files.get(fileEventHandler.fileIndex).filename,
@@ -1428,6 +1671,8 @@ public class SpiralCollision extends Application {
 //				1.0f, 
 //				brightness
 //		));
+		
+		return newRect;
 	}
 
 	private Rectangle addTestRectangleToTestRectCloud(double x, double y, double w, double h, Color color) {
