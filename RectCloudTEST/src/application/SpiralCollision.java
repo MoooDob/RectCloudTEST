@@ -482,7 +482,7 @@ public class SpiralCollision extends Application {
 			spiralCanvas.setVisible(true);
 
 			// mark center of spiral
-			spiralCanvas.getGraphicsContext2D().fillOval(spiralOrigin.getX() - 5 / 2, spiralOrigin.getY() - 5 / 2, 5, 5);
+			if (DEBUG_DRAW) spiralCanvas.getGraphicsContext2D().fillOval(spiralOrigin.getX() - 5 / 2, spiralOrigin.getY() - 5 / 2, 5, 5);
 
 		}
 
