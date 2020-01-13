@@ -80,7 +80,7 @@ public class SpiralCollision extends Application {
 
 	public static long seed = 324;
 
-	final double drawingSpeed = 1000f;
+	final double drawingSpeed = 10f;
 	final double fadeOffset = 1 / drawingSpeed;
 	final double rectFadingSpeed = 1 / drawingSpeed * 3;
 
@@ -118,7 +118,7 @@ public class SpiralCollision extends Application {
 
 	public OriginMovementMode originMovementMode = OriginMovementMode.MEDIAN;
 	
-	public final static boolean DEBUG_DRAW = true;
+	public final static boolean DEBUG_DRAW = false;
 	public final static boolean DEBUG_PRINT = false;
 
 	// Files with this extension will be shown, null or empty array => all files 
