@@ -80,7 +80,7 @@ public class SpiralCollision extends Application {
 
 	public static long seed = 324;
 
-	final double drawingSpeed = 10f;
+	final double drawingSpeed = 1000f;
 	final double fadeOffset = 1 / drawingSpeed;
 	final double rectFadingSpeed = 1 / drawingSpeed * 3;
 
@@ -228,7 +228,7 @@ public class SpiralCollision extends Application {
 			fileTimeline.pause();
 			
 			fileIndex++;
-			if (fileIndex > numFiles) {
+			if (fileIndex >= numFiles) {
 				OnFinished();
 			}
 
@@ -1048,7 +1048,7 @@ public class SpiralCollision extends Application {
 			// Adding Title to the stage
 			stage.setTitle("Spiral Rectangle Cloud of " + rootDirectory.getName() + " (" + sorting.name() + " / " + originMovementMode.name() + ")");
 
-			label.setText("Analysing directory structure...");
+			label.setText("Analyzing directory structure...");
 			
 			fileSizeInfo.put("width.min", 0d);
 			fileSizeInfo.put("width.max", 0d);
