@@ -8,7 +8,7 @@ public class FileInfo {
 		this.hue = hue;
 	}
 	
-	public FileInfo(String filename, int level, double height, double width, float hue) {
+	public FileInfo(String filename, int level, double width, double height, float hue) {
 		this(filename, level, hue);
 		this.width = width;
 		this.height = height;
