@@ -256,7 +256,7 @@ public class SpiralCollision extends Application {
 				isFirstFileInParentFolder = false;
 
 				// set Info label
-				String info = "find location for file #" + fileIndex + " " + filename + " width: " + fileWidth + " height: "
+				String info = "find location for file #" + fileIndex + "/" + numFiles + " " + filename + " width: " + fileWidth + " height: "
 						+ fileHeight;
 				if (DEBUG_PRINT) System.out.println(info);
 				label.setText(info);
