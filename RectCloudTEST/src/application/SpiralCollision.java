@@ -118,8 +118,14 @@ public class SpiralCollision extends Application {
 
 	public OriginMovementMode originMovementMode = OriginMovementMode.MEDIAN;
 	
-	public final static boolean DEBUG_DRAW = false;
-	public final static boolean DEBUG_PRINT = false;
+	public double rasterX = 100;
+	public double rasterY = 100;
+	public double rasterOffsetX = 0; // rasterX / 2;
+	public double rasterOffsetY = 0; // rasterY / 2;
+	
+	
+	public final static boolean DEBUG_DRAW = true;
+	public final static boolean DEBUG_PRINT = true;
 
 	// Files with this extension will be shown, null or empty array => all files 
 	final String[] fileExtensionFilter = {}; //{"java"}; // {"java", "cpp", "h"} // null /*=> all*/
@@ -201,6 +207,7 @@ public class SpiralCollision extends Application {
 	
 	// Origin of the canvas
 	private Point2D canvasOrigin = new Point2D(scene_width / 2, scene_height / 2);
+
 	
 
 
@@ -318,7 +325,7 @@ public class SpiralCollision extends Application {
 //					SpiralOriginsCanvas.getGraphicsContext2D().fillOval(spiralOriginOfParentDirectory.getX() - 5/2, spiralOriginOfParentDirectory.getY() - 5/2, 5, 5); 
 				}
 
-				spiralPositionEventHandler.init(spiralOriginOfParentDirectory);
+				spiralPositionEventHandler.init(rasterize(spiralOriginOfParentDirectory));
 				spiralPositionTimeline.play();
 				
 			};
@@ -456,11 +463,11 @@ public class SpiralCollision extends Application {
 			prev_x = 0;
 			prev_y = 0;
 
-			variant++;
+			//variant++;
 			if (variant < 0 || variant >= numOfSpiralVariants) {
 				variant = 0;
 			} 
-			if (DEBUG_PRINT) System.out.println("  spiral variant: " + variant);
+			if (DEBUG_PRINT) System.out.println("  spiral variant: " + variant + " @ " + spiralOrigin);
 			
 			String spiralOriginKey = getSpiralOriginAsKey(spiralOrigin);
 			if ( ! spirals.containsKey(spiralOriginKey)) {
@@ -1265,7 +1272,7 @@ public class SpiralCollision extends Application {
 			
 			if (DEBUG_PRINT) System.out.println("Center point: "+ (scene_width / 2) + "/" + (scene_height / 2));
 			
-			String canvasCenter = getSpiralOriginAsKey(canvasOrigin );
+			String canvasCenterKey = getSpiralOriginAsKey(rasterize(canvasOrigin));
 			fileEventHandler.init();
 			KeyFrame fileKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), fileEventHandler);
 			KeyFrame spiralPositionKeyFrame = new KeyFrame(Duration.millis(1 / drawingSpeed), spiralPositionEventHandler);
@@ -1328,13 +1335,21 @@ public class SpiralCollision extends Application {
 			SpiralInfo spiralinfo = new SpiralInfo(numOfSpiralVariants);
 			appendDefaultSpiralVariants(spiralinfo, canvasOrigin);
 
-			spirals.put(canvasCenter, spiralinfo);
+			spirals.put(canvasCenterKey, spiralinfo);
 			
 
 			fileTimeline.play();
 
 		}
 
+	}
+
+	public Point2D rasterize(Point2D point2D) {
+		if (point2D == null) return null;
+		
+		Point2D rasterPoint2D = new Point2D((int)(point2D.getX() / rasterX) * rasterX + rasterOffsetX, (int)(point2D.getY() / rasterY) * rasterY + rasterOffsetY);
+		
+		return rasterPoint2D;
 	}
 
 	/**
